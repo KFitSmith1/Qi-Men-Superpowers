@@ -8,4 +8,8 @@ services:
       # Without it the app uses its built-in local calculation.
       - ASTROLOGY_API_KEY=${ASTROLOGY_API_KEY:-}
       - ASTROLOGY_API_URL=${ASTROLOGY_API_URL:-}
+      # Only needed if the frontend is hosted on a DIFFERENT origin (e.g. a
+      # static web/ on here.now). For the single-container deploy the app is
+      # same-origin and this can stay unset.
+      - CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN:-*}
     restart: unless-stopped

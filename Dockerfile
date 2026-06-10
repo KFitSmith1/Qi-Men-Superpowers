@@ -15,5 +15,10 @@ COPY web/ web/
 RUN chmod +x engine/tools/bin/*.sh
 
 EXPOSE 8787
+
+# Container-level health probe (no curl/wget needed in node:slim).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://127.0.0.1:'+(process.env.PORT||8787)+'/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+
 USER node
 CMD ["node", "server/src/index.js"]
