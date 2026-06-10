@@ -309,6 +309,36 @@ main {
   letter-spacing: 0.02em;
 }
 
+/* Day Master strength panel */
+.dm-grid { display: flex; gap: 1.3rem; align-items: stretch; flex-wrap: wrap; }
+.dm-glyph {
+  text-align: center; min-width: 124px; padding: 0.7rem 1.1rem 0.8rem;
+  background: var(--bg-cell); border: 1px solid var(--border); border-radius: 10px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.35rem;
+}
+.dm-glyph .dm-stem { font-family: var(--serif); font-size: 3.1rem; font-weight: 700; line-height: 1; }
+.dm-glyph .el-badge { margin: 0; }
+.dm-polarity { font-size: 0.74rem; color: var(--muted); font-weight: 600; }
+.dm-detail { flex: 1; min-width: 260px; display: flex; flex-direction: column; justify-content: center; }
+.dm-strength { margin-bottom: 0.6rem; }
+.dm-strength-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.7rem; flex-wrap: wrap; }
+.dm-verdict { font-family: var(--serif); font-size: 1.25rem; font-weight: 700; color: var(--maroon); }
+.dm-verdict small { font-size: 0.78rem; color: var(--muted); font-weight: normal; }
+.dm-ratio { font-size: 0.78rem; color: var(--muted); }
+.dm-ratio b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.dm-meter {
+  position: relative; height: 14px; border-radius: 8px; margin: 0.6rem 0 0.35rem;
+  border: 1px solid var(--border);
+  background: linear-gradient(90deg, #cfe0ee 0%, #d6ecdd 50%, #f1e3c8 100%);
+}
+.dm-marker {
+  position: absolute; top: 50%; transform: translate(-50%, -50%);
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--maroon); border: 2.5px solid #fff; box-shadow: 0 1px 4px rgba(60, 30, 10, 0.35);
+}
+.dm-meter-scale { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--muted); }
+.dm-detail .kv { margin-top: 0.2rem; }
+
 .elem-bars { max-width: 580px; margin-top: 0.3rem; }
 .elem-bar { display: grid; grid-template-columns: 6rem 1fr 3rem; align-items: center; gap: 0.7rem; margin-bottom: 0.55rem; font-size: 0.88rem; }
 .elem-bar > span:first-child { font-weight: 600; }

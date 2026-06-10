@@ -92,11 +92,6 @@ function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
-function rawJsonBlock(data) {
-  if (data == null) return '';
-  return `<details class="raw-json"><summary>原始 JSON · Raw structured data</summary><pre>${esc(JSON.stringify(data, null, 2))}</pre></details>`;
-}
-
 function solarNote(result) {
   const cs = result.solarCorrections || (result.solarCorrection ? [result.solarCorrection] : []);
   return cs.filter(Boolean).map((c) =>
@@ -179,7 +174,7 @@ async function showWanwu(plateId, palace) {
   modal.classList.remove('hidden');
   try {
     const r = await api('/api/qimen/wanwu', { plateId, palace });
-    $('#modal-body').innerHTML = `<div class="module-text">${esc(r.text)}</div>${rawJsonBlock(r.data)}`;
+    $('#modal-body').innerHTML = `<div class="module-text" translate="no">${esc(r.text)}</div>`;
   } catch (e) {
     $('#modal-body').innerHTML = `<div class="error-box">${esc(e.message)}</div>`;
   }
@@ -231,30 +226,42 @@ function renderBazi(r) {
       <div class="yrs">${p.startYear}–${p.endYear}</div>
     </div>`).join('');
 
-  const ext = r.external
-    ? (r.external.error
-      ? `<p class="hint">Astrology-API.io: ${esc(r.external.error)}</p>`
-      : `<div class="section-block"><h3>Astrology-API.io 精算 Precision Data</h3>${rawJsonBlock(r.external)}</div>`)
-    : '<p class="hint">配置 ASTROLOGY_API_KEY 可启用 Astrology-API.io 高精度核验。Set ASTROLOGY_API_KEY to enable the precision API.</p>';
+  const sr = Number(r.strength.supportRatio);
+  const srPct = Math.max(0, Math.min(1, isFinite(sr) ? sr : 0.5)) * 100;
+  const polEn = r.dayMaster.polarity === '阳' ? 'Yang' : r.dayMaster.polarity === '阴' ? 'Yin' : '';
 
   return `${solarNote(r)}
     <div class="pillars" translate="no">${pillarCards}</div>
     <div class="section-block">
-      <h3><span translate="no">日主 Day Master · ${esc(r.dayMaster.stem)} ${esc(r.dayMaster.polarity)}${esc(r.dayMaster.element)}</span> (${esc(r.dayMaster.elementEn)})</h3>
-      <table class="kv">
-        <tr><td>月令状态 Seasonal state</td><td>${esc(r.strength.seasonalState)}</td></tr>
-        <tr><td>强弱 Strength</td><td>${esc(r.strength.verdict)} (${esc(r.strength.verdictEn)}) — support ratio ${r.strength.supportRatio}</td></tr>
-        <tr><td>取用提示 Guidance</td><td>${esc(r.strength.note)}</td></tr>
-      </table>
+      <h3>日主 Day Master</h3>
+      <div class="dm-grid">
+        <div class="dm-glyph el-${esc(r.dayMaster.element)}" translate="no">
+          <div class="dm-stem">${esc(r.dayMaster.stem)}</div>
+          <span class="el-badge el-${esc(r.dayMaster.element)}" data-el="${esc(r.dayMaster.element)}">${esc(r.dayMaster.elementEn)}</span>
+          <div class="dm-polarity">${esc(r.dayMaster.polarity)}${esc(r.dayMaster.element)} · ${esc(polEn)} ${esc(r.dayMaster.elementEn)}</div>
+        </div>
+        <div class="dm-detail">
+          <div class="dm-strength">
+            <div class="dm-strength-head">
+              <span class="dm-verdict" translate="no">${esc(r.strength.verdict)} <small>${esc(r.strength.verdictEn)}</small></span>
+              <span class="dm-ratio">支持率 Support ratio <b>${esc(r.strength.supportRatio)}</b></span>
+            </div>
+            <div class="dm-meter" title="支持率 ${esc(r.strength.supportRatio)}"><span class="dm-marker" style="left:${srPct.toFixed(1)}%"></span></div>
+            <div class="dm-meter-scale"><span>弱 Weak</span><span>中和 Balanced</span><span>强 Strong</span></div>
+          </div>
+          <table class="kv">
+            <tr><td>月令状态 Seasonal state</td><td><span translate="no">${esc(r.strength.seasonalState)}</span></td></tr>
+            <tr><td>取用提示 Guidance</td><td>${esc(r.strength.note)}</td></tr>
+          </table>
+        </div>
+      </div>
     </div>
     <div class="section-block"><h3>五行平衡 Five Elements Balance</h3><div class="elem-bars">${bars}</div></div>
     <div class="section-block">
       <h3>大运 10-Year Luck Pillars · ${esc(lp.direction)} (${esc(lp.directionEn)}) · 起运 ${lp.startAge} 岁（参照节气 ${esc(lp.referenceTerm)}）</h3>
       <div class="luck-row" translate="no">${luckCards}</div>
       <p class="hint">起运岁数按「3 日 = 1 年」由出生到节气的天数推算（节气取近似公式，误差 ≤1 天）。</p>
-    </div>
-    ${ext}
-    ${rawJsonBlock(r)}`;
+    </div>`;
 }
 
 /* ---------------- Tab loading ---------------- */
@@ -323,7 +330,7 @@ async function loadTab(tab) {
       html += solarNote(r);
       if (tab === 'xunshijieyun') html += renderXunshi(r);
       if (plate && r.plateId) html += plateMeta(plate) + renderPlateGrid(plate, r.plateId) + '<br>';
-      html += `<div class="module-text">${esc(r.text)}</div>${rawJsonBlock(r.data)}`;
+      html += `<div class="module-text">${esc(r.text)}</div>`;
     }
     body.innerHTML = html;
   } catch (e) {
