@@ -44,6 +44,74 @@ const branchSub = (ch) => {
   return `${pinyinOf(ch)}${a ? ` · ${esc(a[1])} ${esc(a[0])}` : ''}`;
 };
 
+/* English glosses for the recurring labels in the engine's reading output. */
+const KEY_EN = {
+  '出生时间': 'Birth time', '出生四柱': 'Four Pillars', '年干': 'Year Stem',
+  '月令': 'Monthly Order', '天盘': 'Heaven Plate', '地盘': 'Earth Plate',
+  '神': 'Deity', '星': 'Star', '门': 'Gate', '六害': 'Six Harms',
+  '月令关系': 'Monthly relation', '化解': 'Remedy', '天干': 'Stem', '地支': 'Branch',
+  '先灭象': 'Dissolve image', '日干': 'Day Stem', '时干': 'Hour Stem',
+};
+const SECTION_EN = {
+  '财富七要害': 'Wealth · 7 Key Factors', '事业七要害': 'Career · 7 Key Factors',
+  '婚恋七要害': 'Romance · 7 Key Factors', '性格分析': 'Personality',
+};
+
+/* Decorate a plain text fragment: escape, turn [tags] into chips, colour 吉/凶. */
+function deco(s) {
+  let t = esc(s);
+  t = t.replace(/\[([^\]]+)\]/g, '<span class="rd-tag">$1</span>');
+  t = t.replace(/(吉)/g, '<span class="jixi-吉">$1</span>').replace(/(凶)/g, '<span class="jixi-凶">$1</span>');
+  return t;
+}
+const gloss = (label) => KEY_EN[label] ? ` <small>${KEY_EN[label]}</small>` : '';
+const indentRem = (n) => `margin-left:${Math.min(n, 10) * 0.5}rem`;
+
+/*
+ * Turn the engine's indented, ===section=== text reports into structured,
+ * readable HTML. Generic across modules; falls back to plain lines.
+ */
+function formatReading(raw) {
+  const lines = String(raw).replace(/\r/g, '').split('\n');
+  let html = '';
+  let inItem = false;
+  const closeItem = () => { if (inItem) { html += '</div>'; inItem = false; } };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (/^[=\-]{3,}$/.test(trimmed)) continue;                 // underline rule — skip
+    const indent = line.length - line.replace(/^\s+/, '').length;
+    const next = (lines[i + 1] || '').trim();
+
+    if (indent === 0 && /^[=]{3,}$/.test(next)) {              // title underlined with ===
+      closeItem(); html += `<h3 class="rd-title">${deco(trimmed)}</h3>`; continue;
+    }
+    const sec = trimmed.match(/^={2,}\s*(.+?)\s*={2,}$/);      // === Section ===
+    if (sec) {
+      closeItem();
+      html += `<h4 class="rd-section">${deco(sec[1])}${SECTION_EN[sec[1]] ? ` <small>${SECTION_EN[sec[1]]}</small>` : ''}</h4>`;
+      continue;
+    }
+    if (/\s—\s/.test(trimmed) && /宫/.test(trimmed)) {          // factor header "戊(本钱) — 震3宫(…)"
+      closeItem();
+      html += `<div class="rd-item"><div class="rd-item-h">${deco(trimmed)}</div>`;
+      inItem = true; continue;
+    }
+    const kv = trimmed.match(/^([^：:，。]{1,16})[：:]\s*(.*)$/); // key: value
+    if (kv) {
+      const label = kv[1], val = kv[2];
+      if (!val) html += `<div class="rd-kv-h" style="${indentRem(indent)}">${deco(label)}${gloss(label)}</div>`;
+      else html += `<div class="rd-kv" style="${indentRem(indent)}"><span class="rd-k">${deco(label)}${gloss(label)}</span><span class="rd-v">${deco(val)}</span></div>`;
+      continue;
+    }
+    html += `<div class="rd-line" style="${indentRem(indent)}">${deco(trimmed)}</div>`;
+  }
+  closeItem();
+  return `<div class="reading" translate="no">${html}</div>`;
+}
+
 function setStatus(msg, isError) {
   const el = $('#status');
   el.textContent = msg || '';
@@ -174,7 +242,7 @@ async function showWanwu(plateId, palace) {
   modal.classList.remove('hidden');
   try {
     const r = await api('/api/qimen/wanwu', { plateId, palace });
-    $('#modal-body').innerHTML = `<div class="module-text" translate="no">${esc(r.text)}</div>`;
+    $('#modal-body').innerHTML = formatReading(r.text);
   } catch (e) {
     $('#modal-body').innerHTML = `<div class="error-box">${esc(e.message)}</div>`;
   }
@@ -330,7 +398,7 @@ async function loadTab(tab) {
       html += solarNote(r);
       if (tab === 'xunshijieyun') html += renderXunshi(r);
       if (plate && r.plateId) html += plateMeta(plate) + renderPlateGrid(plate, r.plateId) + '<br>';
-      html += `<div class="module-text">${esc(r.text)}</div>`;
+      html += formatReading(r.text);
     }
     body.innerHTML = html;
   } catch (e) {

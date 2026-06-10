@@ -372,6 +372,39 @@ table.kv td:first-child { color: var(--muted); white-space: nowrap; font-weight:
   font-size: 0.9rem; line-height: 1.75; color: var(--ink); overflow-x: auto;
   box-shadow: var(--shadow);
 }
+/* ---------- Formatted reading (parsed engine output) ---------- */
+.reading {
+  background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+  border-left: 4px solid var(--gold); padding: 1.2rem 1.4rem; box-shadow: var(--shadow);
+  font-size: 0.92rem; line-height: 1.6; color: var(--ink);
+}
+.reading > *:first-child { margin-top: 0; }
+.rd-title { font-family: var(--serif); color: var(--maroon); font-size: 1.18rem; margin: 0 0 0.8rem; }
+.rd-section {
+  font-family: var(--serif); font-size: 1rem; color: #fff;
+  background: linear-gradient(90deg, var(--maroon), var(--maroon-dark));
+  padding: 0.42rem 0.85rem; border-radius: 7px; margin: 1.3rem 0 0.7rem; letter-spacing: 0.02em;
+}
+.rd-section small { font-weight: normal; opacity: 0.85; font-size: 0.78em; }
+.rd-item {
+  border: 1px solid var(--border); border-radius: 9px; padding: 0.65rem 0.85rem;
+  margin: 0.6rem 0; background: var(--bg-cell);
+}
+.rd-item-h {
+  font-family: var(--serif); font-weight: 700; color: var(--maroon); font-size: 1.02rem;
+  margin-bottom: 0.45rem; border-bottom: 1px solid var(--border); padding-bottom: 0.32rem;
+}
+.rd-kv { display: flex; gap: 0.6rem; margin: 0.14rem 0; align-items: baseline; }
+.rd-kv .rd-k { color: var(--muted); font-weight: 600; min-width: 5rem; flex: 0 0 auto; }
+.rd-kv .rd-k small, .rd-kv-h small { color: var(--faint); font-weight: normal; font-size: 0.78em; }
+.rd-kv .rd-v { color: var(--ink); }
+.rd-kv-h { font-weight: 700; color: var(--gold); margin: 0.5rem 0 0.2rem; }
+.rd-line { color: var(--ink); margin: 0.14rem 0; }
+.rd-tag {
+  display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 0 0.38rem; margin: 0 0.12rem;
+  border-radius: 4px; background: rgba(192, 57, 43, 0.1); color: var(--red); border: 1px solid rgba(192, 57, 43, 0.3);
+}
+
 details.raw-json { margin-top: 0.9rem; }
 details.raw-json summary { cursor: pointer; color: var(--muted); font-size: 0.82rem; font-weight: 600; }
 details.raw-json pre {
