@@ -51,11 +51,166 @@ const KEY_EN = {
   '神': 'Deity', '星': 'Star', '门': 'Gate', '六害': 'Six Harms',
   '月令关系': 'Monthly relation', '化解': 'Remedy', '天干': 'Stem', '地支': 'Branch',
   '先灭象': 'Dissolve image', '日干': 'Day Stem', '时干': 'Hour Stem',
+  '月令(大环境,天时)': 'Monthly Order (climate)', '灭象方式': 'Dissolving method',
+  '光引': 'Light attractor', '声引': 'Sound attractor', '气引': 'Air attractor',
+  '择时': 'Timing', '9天合象': '9-day pairing', '安全方位': 'Safe directions',
+  '状态': 'State', '用神': 'Focus',
 };
 const SECTION_EN = {
   '财富七要害': 'Wealth · 7 Key Factors', '事业七要害': 'Career · 7 Key Factors',
   '婚恋七要害': 'Romance · 7 Key Factors', '性格分析': 'Personality',
+  '内在性格(日干)': 'Inner Character (Day Stem)', '外在性格(时干)': 'Outer Persona (Hour Stem)',
+  '天干角色(各角色人事)': 'Stem Roles (People & Matters)', '干财(控制力)': 'Wealth Control',
+  '注意事项': 'Cautions', '符使(直属上级)': 'Chief & Envoy (Direct Superior)',
+  '踩一捧一(财富与事业只能二选一)': 'Trade-off: Wealth vs Career',
+  '适合行业(从戊所在宫推算)': 'Suitable Industries (from 戊’s palace)',
+  '保护天干': 'Protected Stems', '三奇含义': 'Three Nobles Meaning',
 };
+
+/* Exact English translations for the engine's fixed explanatory sentences. */
+const EN_FIXED = {
+  '月令是天时大势，决定做事的难度和量级，难以完全逆转':
+    'The Monthly Order is the prevailing climate: it sets the difficulty and scale of endeavours and can hardly be reversed.',
+  '选择被月令生助的方向会事半功倍，逆天时看性价比':
+    'Directions supported by the Monthly Order give twice the result for half the effort; going against the season, weigh the cost-benefit.',
+  '月令生→扩张(量大) | 月令同→稳健(量大) | 克月令→努力(量小) | 生月令→损耗(量小) | 月令克→大亏(量小，最差)':
+    'Month feeds you → expand (large) | Same as month → steady (large) | You overcome month → effortful (small) | You feed month → drain (small) | Month overcomes you → heavy loss (smallest, worst)',
+  '克月令，努力，量小': 'You overcome the month — effortful, small scale',
+  '月令克，大亏，量小。最差': 'Month overcomes you — heavy loss, smallest scale (worst)',
+  '生月令，损耗，量小': 'You feed the month — draining, small scale',
+  '月令生，扩张，量大': 'Month feeds you — expansion, large scale',
+  '月令同，稳健，量大': 'Same as the month — steady, large scale',
+  '灭象方式: 可移动,不可抛弃,不可赠送': 'Dissolving method: may be moved; never discarded or given away.',
+  '可移动,不可抛弃,不可赠送': 'May be moved; never discarded or given away.',
+  '移动后不要再碰，不要再拿回原位直到问题解决': 'After moving it, do not touch it again or return it until the issue is resolved.',
+  '摆放后的3-7天内，留意克应信号': 'Watch for response signals within 3–7 days of placement.',
+  '用则为信，三月起效，前提和环境发生重大变化时结束': 'Apply with trust; takes effect in about three months; ends when circumstances change fundamentally.',
+  '只灭能灭的象，不能移动的不动': 'Only dissolve images that can be dissolved; leave immovable things untouched.',
+  '必须在真太阳时的对应时辰执行': 'Must be carried out at the matching true-solar-time hour.',
+  '亮灯、焚香、反光镜': 'Bright lamps, incense, mirrors.',
+  '响铃、乐器': 'Bells, musical instruments.',
+  '通风、开窗': 'Ventilation, open windows.',
+  '两物各自方位放满9天（代表天干本身），再将两物放到一起':
+    'Keep each object in its own direction for 9 full days (representing the stems themselves), then bring the two together.',
+  '冲突禁忌：化解物的地支象意绝对不能与该宫位地支相冲':
+    'Conflict taboo: a remedy object’s branch imagery must never clash with the palace branch.',
+  '动静结合禁忌：泄法物应能动（铃铛偶尔响），合法物应静（红卡安放不动）':
+    'Motion taboo: draining objects should be able to move (a bell that occasionally rings); combining objects should stay still.',
+  '填实禁忌：在宫位逢空亡且带击刑/凶格时，绝对禁止使用大质量、实心、沉重的物品进行硬填':
+    'Filling taboo: when a palace is void with punishment or malign patterns, never hard-fill it with massive, solid, heavy objects.',
+  '时间错位禁忌：不校对真太阳时，或在日全食、月全食、雷电交加等极端天气下实施':
+    'Timing taboo: never skip the true-solar-time correction, and never act during eclipses or violent thunderstorms.',
+  '材质纯度禁忌：泄法用金必须真材实料（铜、钢、铝），电镀塑料无效':
+    'Material taboo: metal used for draining must be genuine (copper, steel, aluminium); plated plastic is ineffective.',
+  '贪合忘生禁忌：入墓宫位慎用合法——合会进一步束缚能量加重入墓，优先用生和泄':
+    'Combination taboo: for tomb palaces avoid combining — it binds the energy further; prefer feeding and draining.',
+  '贪多禁忌：一个宫位内放置过多属性混杂的化解物':
+    'Excess taboo: do not crowd one palace with too many mixed remedy objects.',
+  '正确的时间做正确的事': 'Do the right thing at the right time.',
+  '月令是天时大势，决定做事的难度和量级': 'The Monthly Order is the prevailing climate; it sets difficulty and scale.',
+};
+
+/* Token glossary for templated lines — longest match wins. */
+const EN_VOCAB = {
+  // stems & branches (pinyin)
+  '甲': 'Jia', '乙': 'Yi', '丙': 'Bing', '丁': 'Ding', '戊': 'Wu', '己': 'Ji',
+  '庚': 'Geng', '辛': 'Xin', '壬': 'Ren', '癸': 'Gui',
+  '子': 'Zi', '丑': 'Chou', '寅': 'Yin', '卯': 'Mao', '辰': 'Chen', '巳': 'Si',
+  '午': 'Wu', '未': 'Wei', '申': 'Shen', '酉': 'You', '戌': 'Xu', '亥': 'Hai',
+  // gates, stars, deities
+  '休门': 'Rest Gate', '生门': 'Life Gate', '伤门': 'Harm Gate', '杜门': 'Block Gate',
+  '景门': 'View Gate', '死门': 'Death Gate', '惊门': 'Shock Gate', '开门': 'Open Gate',
+  '天蓬': 'Tianpeng', '天任': 'Tianren', '天冲': 'Tianchong', '天辅': 'Tianfu',
+  '天英': 'Tianying', '天芮': 'Tianrui', '天柱': 'Tianzhu', '天心': 'Tianxin', '天禽': 'Tianqin',
+  '值符': 'Chief', '值使': 'Envoy', '螣蛇': 'Serpent', '太阴': 'Great Moon', '六合': 'Harmony',
+  '白虎': 'White Tiger', '玄武': 'Black Tortoise', '九地': 'Nine Earth', '九天': 'Nine Heaven',
+  '勾陈': 'Hook', '朱雀': 'Vermilion Bird',
+  // elements, polarity, verdicts
+  '木': 'Wood', '火': 'Fire', '土': 'Earth', '金': 'Metal', '水': 'Water',
+  '吉': 'auspicious', '凶': 'inauspicious', '阴': 'Yin', '阳': 'Yang',
+  // palaces & directions
+  '中5宫': 'Center 5 Palace', '乾': 'Qian', '坎': 'Kan', '艮': 'Gen', '震': 'Zhen',
+  '巽': 'Xun', '离': 'Li', '坤': 'Kun', '兑': 'Dui', '宫': 'Palace',
+  '东南': 'Southeast', '东北': 'Northeast', '西南': 'Southwest', '西北': 'Northwest',
+  '东': 'East', '南': 'South', '西': 'West', '北': 'North',
+  // 12 life stages
+  '长生': 'Growth', '沐浴': 'Bath', '冠带': 'Adornment', '临官': 'Officer', '帝旺': 'Peak',
+  '衰': 'Decline', '病': 'Sickness', '死': 'Death', '墓': 'Tomb', '绝': 'Severed',
+  '胎': 'Conceived', '养': 'Nurture',
+  // harms & patterns
+  '击刑': 'Punishment', '入墓': 'Tomb-entry', '门迫': 'Forced Gate', '空亡': 'Void',
+  '对宫': 'opposite palace', '刑': 'Punishment', '空': 'Void', '凶煞': 'malign force',
+  '伏吟': 'Fu Yin', '反吟': 'Fan Yin', '危险': 'danger',
+  // remedy operations
+  '压击刑': 'Suppress Punishment', '压入墓': 'Suppress Tomb-entry', '压门迫': 'Suppress Forced Gate',
+  '压庚': 'Suppress Geng', '填空亡': 'Fill the Void', '用合化解': 'resolve by combination',
+  '用冲打开墓库': 'open the tomb by clash', '以柔克刚': 'soft overcomes hard',
+  '缺金补金': 'missing Metal → supplement Metal', '先灭象': 'first dissolve the image',
+  '将': 'move', '的象移出': '’s imagery out of', '合': 'combines', '冲': 'clashes',
+  '虚假不实': 'false and unreal', '克': 'overcomes',
+  // structure words
+  '天盘': 'Heaven plate', '地盘': 'Earth plate', '天干': 'Stem', '地支': 'Branch',
+  '高处': 'place high —', '低处': 'place low —',
+  '本钱': 'Capital', '利润': 'Profit', '合作关系': 'Partnerships', '时机': 'Timing',
+  '时干': 'Hour Stem', '日干': 'Day Stem', '年干': 'Year Stem', '月干': 'Month Stem',
+  '所在公司或单位': 'company / organisation', '直属上级': 'direct superior', '控制力': 'control',
+  '安全方位': 'Safe directions', '状态': 'State', '用神': 'Focus (Yong Shen)',
+  // colours
+  '墨绿': 'dark green', '暗红': 'dark red', '棕色': 'brown', '金黄': 'golden yellow',
+  '黄白': 'yellow-white', '深蓝': 'deep blue', '暗棕': 'dark brown', '蓝黑': 'blue-black',
+  '红色': 'red', '白色': 'white', '黑色': 'black', '黄色': 'yellow', '绿色': 'green',
+  // remedy objects
+  '软植': 'soft plants', '藤蔓花草葫芦': 'vines, flowers & gourds',
+  '尖锐': 'sharp items', '烛火刀剑': 'candles, knives & swords',
+  '容器': 'containers', '花盆存钱罐': 'flower pots & piggy banks',
+  '浑水': 'murky water', '墨水茶壶': 'ink & teapots',
+  '牛摆件': 'ox ornament', '鸡摆件': 'rooster ornament', '猴摆件': 'monkey ornament',
+  '狗玩偶或图片': 'dog figure or picture', '小猪存钱罐': 'piggy bank',
+  '羊雕像或玩偶': 'goat statue or doll', '水盆代替': 'use a water basin instead',
+  '牛': 'ox', '鸡': 'rooster', '猴': 'monkey', '狗': 'dog', '猪': 'pig', '羊': 'goat',
+  '龙': 'dragon', '马': 'horse', '兔': 'rabbit', '虎': 'tiger', '蛇': 'snake', '鼠': 'rat',
+};
+const EN_VOCAB_MAXLEN = Math.max(...Object.keys(EN_VOCAB).map((k) => k.length));
+
+/* Translate a line via EN_FIXED, else longest-match glossary segmentation.
+   Returns null when coverage of CJK characters is too low to be useful. */
+function cnEn(s) {
+  const t = String(s).trim();
+  if (!t) return null;
+  if (EN_FIXED[t]) return EN_FIXED[t];
+  let out = '', covered = 0, total = 0, i = 0;
+  while (i < t.length) {
+    let hit = null;
+    for (let len = Math.min(EN_VOCAB_MAXLEN, t.length - i); len > 0; len--) {
+      const seg = t.substr(i, len);
+      if (EN_VOCAB[seg] !== undefined) { hit = seg; break; }
+    }
+    if (hit) {
+      out += EN_VOCAB[hit] + ' ';
+      const cjk = (hit.match(/[一-鿿]/g) || []).length;
+      covered += cjk; total += cjk;
+      i += hit.length;
+    } else {
+      const ch = t[i];
+      if (/[一-鿿]/.test(ch)) total += 1;
+      out += ch;
+      i += 1;
+    }
+  }
+  if (total < 2 || covered / total < 0.55) return null;
+  return out
+    .replace(/，/g, ', ').replace(/。/g, '. ').replace(/：/g, ': ')
+    .replace(/（/g, ' (').replace(/）/g, ') ').replace(/、/g, ', ')
+    .replace(/\s+([,):.])/g, '$1').replace(/\(\s+/g, '(')
+    .replace(/\s{2,}/g, ' ').trim();
+}
+
+/* English subtitle block for a translated line (safe: cnEn output is built
+   from our own glossary strings plus passthrough chars, escaped here). */
+function enSub(s) {
+  const en = cnEn(s);
+  return en ? `<small class="rd-en">${esc(en)}</small>` : '';
+}
 
 /* Decorate a plain text fragment: escape, turn [tags] into chips, colour 吉/凶. */
 function deco(s) {
@@ -96,17 +251,17 @@ function formatReading(raw) {
     }
     if (/\s—\s/.test(trimmed) && /宫/.test(trimmed)) {          // factor header "戊(本钱) — 震3宫(…)"
       closeItem();
-      html += `<div class="rd-item"><div class="rd-item-h">${deco(trimmed)}</div>`;
+      html += `<div class="rd-item"><div class="rd-item-h">${deco(trimmed)}${enSub(trimmed)}</div>`;
       inItem = true; continue;
     }
     const kv = trimmed.match(/^([^：:，。]{1,16})[：:]\s*(.*)$/); // key: value
     if (kv) {
       const label = kv[1], val = kv[2];
       if (!val) html += `<div class="rd-kv-h" style="${indentRem(indent)}">${deco(label)}${gloss(label)}</div>`;
-      else html += `<div class="rd-kv" style="${indentRem(indent)}"><span class="rd-k">${deco(label)}${gloss(label)}</span><span class="rd-v">${deco(val)}</span></div>`;
+      else html += `<div class="rd-kv" style="${indentRem(indent)}"><span class="rd-k">${deco(label)}${gloss(label)}</span><span class="rd-v">${deco(val)}${enSub(val)}</span></div>`;
       continue;
     }
-    html += `<div class="rd-line" style="${indentRem(indent)}">${deco(trimmed)}</div>`;
+    html += `<div class="rd-line" style="${indentRem(indent)}">${deco(trimmed)}${enSub(trimmed)}</div>`;
   }
   closeItem();
   return `<div class="reading" translate="no">${html}</div>`;

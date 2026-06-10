@@ -400,6 +400,11 @@ table.kv td:first-child { color: var(--muted); white-space: nowrap; font-weight:
 .rd-kv .rd-v { color: var(--ink); }
 .rd-kv-h { font-weight: 700; color: var(--gold); margin: 0.5rem 0 0.2rem; }
 .rd-line { color: var(--ink); margin: 0.14rem 0; }
+.rd-en {
+  display: block; color: var(--faint); font-style: italic; font-weight: normal;
+  font-size: 0.8em; line-height: 1.45; margin-top: 0.06rem;
+}
+.rd-item-h .rd-en { font-family: var(--sans); }
 .rd-tag {
   display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 0 0.38rem; margin: 0 0.12rem;
   border-radius: 4px; background: rgba(192, 57, 43, 0.1); color: var(--red); border: 1px solid rgba(192, 57, 43, 0.3);
