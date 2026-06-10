@@ -49,8 +49,11 @@ function commonParams() {
   return p;
 }
 
+/* Prefix API paths with the configured backend origin (config.js). Empty = same origin. */
+const apiUrl = (path) => (window.QMS_API_BASE || '') + path;
+
 async function api(path, body) {
-  const res = await fetch(path, {
+  const res = await fetch(apiUrl(path), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -306,7 +309,7 @@ async function init() {
   $('#event-time').value = now.toTimeString().slice(0, 5);
 
   try {
-    const res = await fetch('/api/health');
+    const res = await fetch(apiUrl('/api/health'));
     const health = await res.json();
     const sel = $('#question');
     for (const q of health.eventQuestions) {

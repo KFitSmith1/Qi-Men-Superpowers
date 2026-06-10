@@ -28,6 +28,11 @@ const { trueSolarTime } = require('./solar');
 const PORT = Number(process.env.PORT || 8787);
 const WEB_ROOT = path.resolve(__dirname, '..', '..', 'web');
 
+// When the frontend is hosted on a different origin (e.g. static web/ published
+// to here.now while this server runs elsewhere), set CORS_ALLOW_ORIGIN to that
+// origin, e.g. "https://woody-rosette-bekc.here.now". Defaults to "*".
+const CORS_ORIGIN = process.env.CORS_ALLOW_ORIGIN || '*';
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -61,7 +66,10 @@ function cacheSet(key, value) {
 
 function sendJson(res, status, body) {
   const data = JSON.stringify(body);
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': CORS_ORIGIN,
+  });
   res.end(data);
 }
 
@@ -166,6 +174,17 @@ function serveStatic(req, res) {
 }
 
 const server = http.createServer(async (req, res) => {
+  // CORS preflight — lets a browser on a different origin call the JSON API.
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': CORS_ORIGIN,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Max-Age': '86400',
+    });
+    res.end();
+    return;
+  }
   const routeKey = `${req.method} ${req.url.split('?')[0]}`;
   const handler = routes[routeKey];
   if (!handler) {
