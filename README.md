@@ -44,6 +44,16 @@ calendar math, and renders everything in a bilingual (中文 / English) web UI.
 | 化气阵 Array | `qimen_huaqizhen.sh` | Per-palace array-placement plans to suppress harmful energies |
 | 移神换将 Remedy | `qimen_yishenhuanjiang.sh` | Transformation remedies: removal, combination, drainage, clash |
 
+**问答 Ask — conversational interpreter** (optional)
+- Streaming chat that answers BaZi/Qi Men questions, grounded in your most
+  recently computed reading and an optional knowledge base
+- Free in-browser **voice**: speak questions (Web Speech `SpeechRecognition`)
+  and have replies read aloud (`speechSynthesis`), following the 中文/EN toggle
+- **Pluggable, non-Anthropic providers** chosen by env vars — works offline out
+  of the box (no keys) and scales up to OpenAI + a hosted knowledge base
+- **RAG** over an [Obsidian](https://obsidian.md) vault: notes are chunked,
+  embedded, and retrieved per question; the source notes used are shown as tags
+
 ## Quick start
 
 Requires **Node.js ≥ 18** and **Bash** (the engine has zero other dependencies — no npm install needed).
@@ -71,6 +81,7 @@ and export it before starting (or let docker-compose pass it through).
 | `POST /api/qimen/plate` | `{ datetime, type: "birth"\|"event", tianqin?, longitude?, tzOffset? }` | full plate JSON + `plateId` |
 | `POST /api/qimen/analyze` | `{ module, birth?, eventTime?, question?, topic?, yixiang?, familyStems?, tianqin?, longitude?, tzOffset? }` | `{ text, data, birthPlate?, eventPlate?, plateId }` |
 | `POST /api/qimen/wanwu` | `{ plateId, palace }` or `{ stem?/star?/gate?/deity?/state? }` | correspondence text + JSON |
+| `POST /api/chat` | `{ messages:[{role,content}], context?, lang? }` | **SSE stream** of `{type:"token"\|"sources"\|"done"\|"error", …}` |
 
 When `longitude` is supplied, datetimes are corrected to true solar time before
 plate setting and the correction is echoed back (`solarCorrection`).
@@ -78,16 +89,64 @@ plate setting and the correction is echoed back (`solarCorrection`).
 Deterministic computations (plates, module runs, BaZi) are cached in memory
 for 10 minutes; cached plates power the palace-click Wan Wu lookups.
 
+## Conversational interpreter (问答 Ask)
+
+The **Ask** tab is optional and degrades gracefully: with no configuration it
+runs a `stub` provider (an offline canned stream) so the UI, streaming, and
+voice all work without any keys. Three independent pieces are each chosen by an
+environment variable.
+
+**1 · Language model** — `LLM_PROVIDER`
+- `stub` (default) — offline, no keys
+- `openai` — any OpenAI-compatible `/chat/completions` gateway. Set
+  `OPENAI_API_KEY`, optional `OPENAI_BASE_URL` (default `https://api.openai.com/v1`)
+  and `OPENAI_MODEL` (default `gpt-4o-mini`).
+
+**2 · Embeddings** — `EMBEDDINGS_PROVIDER`
+- `hash` — offline deterministic vectorizer (no keys; used for tests/fallback)
+- `openai` (default when `OPENAI_API_KEY` is set) — `text-embedding-3-small`
+
+**3 · Vector store** — `VECTOR_STORE`
+- `local` (default) — the index is a JSON file (`VECTOR_FILE`, gitignored);
+  in-process cosine search
+- `insforge` — the index is persisted as one JSON blob in an
+  [InsForge](https://insforge.dev) storage bucket and loaded on boot (durable
+  across the ephemeral deploy container); cosine search runs in-process, which
+  is ideal for a personal vault's scale. Set `INSFORGE_BASE_URL` (your project
+  URL), `INSFORGE_API_KEY` (sent as `x-api-key`), `INSFORGE_BUCKET`, and optional
+  `INSFORGE_OBJECT` (default `qms_vectors.json`).
+
+Retrieval is automatic: `/api/chat` embeds the latest question, pulls the top
+matching chunks, injects them as grounding context, and streams a `sources`
+event listing the notes used. The system prompt forbids inventing chart
+calculations, so answers stay anchored to the computed reading and the corpus.
+
+### Building the knowledge base from an Obsidian vault
+
+```bash
+cd server
+npm run insforge:check                 # validate InsForge creds + bucket (if used)
+npm run ingest -- /path/to/your/vault  # chunk -> embed -> upsert the index
+```
+
+`GET /api/health` reports the live chat config and the loaded chunk count under
+`chat`. See `.env.example` for the full list of variables.
+
 ## Architecture
 
 ```
 web/        static bilingual frontend (no build step) — nine-palace grid,
             BaZi pillars, five-element bars, luck-pillar timeline, module tabs
 server/     zero-dependency Node HTTP server
-  src/index.js   routes, static serving, response cache
+  src/index.js   routes, static serving, response cache, /api/chat SSE
   src/qimen.js   engine wrapper — per-request temp dirs around the bash CLIs
   src/bazi.js    Ten Gods / hidden stems / five elements / strength / luck pillars
   src/solar.js   true solar time + Jie 节 solar-term approximation (±1 day)
+  src/llm.js          chat provider adapter (stub | openai-compatible)
+  src/embeddings.js   embeddings adapter (hash | openai)
+  src/vectorstore.js  vector index + cosine search (local | insforge storage)
+  src/obsidian.js     Obsidian vault loader + chunker
+  src/ingest.js       CLI: vault -> chunk -> embed -> upsert
 engine/     vendored qmenpowers (GPL-3.0) — pure-Bash plate engine + modules
 ```
 

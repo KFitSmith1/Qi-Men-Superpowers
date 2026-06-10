@@ -153,6 +153,12 @@ const routes = {
     modules: qimen.MODULES,
     eventQuestions: qimen.EVENT_QUESTIONS,
     astrologyApiConfigured: Boolean(process.env.ASTROLOGY_API_KEY),
+    chat: {
+      llmProvider: llm.PROVIDER,
+      embeddings: embeddings.PROVIDER,
+      vectorStore: vectorstore.BACKEND,
+      knowledgeChunks: await vectorstore.count().catch(() => null),
+    },
   }),
 };
 
@@ -271,4 +277,10 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`Qi Men Superpowers listening on http://localhost:${PORT}`);
   console.log(`Astrology-API.io integration: ${process.env.ASTROLOGY_API_KEY ? 'enabled' : 'disabled (local BaZi calculation only)'}`);
+  console.log(`Chat: LLM=${llm.PROVIDER} · embeddings=${embeddings.PROVIDER} · vectorStore=${vectorstore.BACKEND}`);
+  // Preload the knowledge index so config problems surface at boot, not on the
+  // first question. Non-fatal: chat still works without retrieval.
+  vectorstore.count()
+    .then((n) => console.log(`Knowledge base: ${n} chunks loaded from "${vectorstore.BACKEND}"`))
+    .catch((e) => console.warn(`Knowledge base unavailable (${vectorstore.BACKEND}): ${e.message} — chat will run without retrieval`));
 });
