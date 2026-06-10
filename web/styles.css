@@ -156,6 +156,14 @@ main {
   font-weight: 600; box-shadow: 0 2px 6px rgba(124, 29, 43, 0.25);
 }
 
+#toolbar { display: flex; justify-content: flex-end; margin: -0.4rem 0 0.9rem; }
+#print-btn {
+  background: #fff; color: var(--gold); border: 1px solid var(--gold);
+  border-radius: 8px; padding: 0.42rem 0.95rem; font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+#print-btn:hover { background: var(--gold); color: #fff; }
+
 #tab-body { min-height: 420px; }
 #tab-body > h2 {
   font-family: var(--serif);
@@ -259,8 +267,24 @@ main {
 .pillar h4 { margin: 0 0 0.45rem; font-size: 0.8rem; color: var(--muted); font-weight: 600; }
 .pillar .tg { font-size: 0.76rem; color: var(--gold); min-height: 1.2em; font-weight: 600; }
 .pillar .tg small { color: var(--faint); font-weight: normal; }
-.pillar .stem, .pillar .branch { font-size: 2.2rem; line-height: 1.18; font-weight: 700; font-family: var(--serif); }
-.pillar .el-label { display: block; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.02em; margin-bottom: 0.35rem; }
+.pillar .stem, .pillar .branch { font-size: 2.2rem; line-height: 1.16; font-weight: 700; font-family: var(--serif); }
+.pillar .pinyin { font-size: 0.72rem; color: var(--muted); font-style: italic; margin-top: 0.05rem; }
+
+/* Circular five-element badge — colored ring + element glyph + English name */
+.el-badge {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
+  margin: 0.3rem 0 0.4rem;
+}
+.el-badge::before {
+  content: attr(data-el);
+  width: 1.55rem; height: 1.55rem; flex: 0 0 auto;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px solid currentColor;
+  background: color-mix(in srgb, currentColor 14%, #fff);
+  font-family: var(--serif); font-size: 0.9rem; font-weight: 700;
+}
 .pillar .hidden { margin-top: 0.5rem; font-size: 0.72rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 0.4rem; }
 .pillar .hidden b { font-weight: 700; font-size: 0.85rem; }
 .pillar .hidden small { color: var(--faint); }
@@ -302,6 +326,7 @@ main {
 }
 .luck .gz { font-size: 1.4rem; font-weight: 700; font-family: var(--serif); margin: 0.1rem 0; }
 .luck .age { color: var(--maroon); font-weight: 700; }
+.luck .luck-py { color: var(--muted); font-size: 0.68rem; font-style: italic; }
 .luck .yrs { color: var(--faint); font-size: 0.72rem; }
 
 table.kv { border-collapse: collapse; font-size: 0.9rem; width: 100%; }
@@ -363,4 +388,22 @@ footer a:hover { text-decoration: underline; }
 .error-box {
   background: rgba(192, 57, 43, 0.08); border: 1px solid rgba(192, 57, 43, 0.4); color: var(--red);
   border-radius: 8px; padding: 0.9rem 1.1rem; font-weight: 500;
+}
+
+/* ---------------- Print / Save-as-PDF ---------------- */
+@media print {
+  body { background: #fff; }
+  header { padding: 0.5rem 0 0.8rem; }
+  header::after { display: none; }
+  #controls, #tabs, #toolbar, footer, .modal, details.raw-json, .legend { display: none !important; }
+  main { display: block; max-width: none; margin: 0; padding: 0; }
+  #content { width: 100%; }
+  .panel, .section-block, .palace, .pillar, .module-text, .plate-meta, #tabs button {
+    box-shadow: none !important;
+  }
+  .section-block, .pillar, .palace, .module-text, .luck { break-inside: avoid; }
+  .grid9, .pillars, .elem-bars { max-width: none; }
+  #tab-body > h2 { margin-top: 0; }
+  a { color: inherit; text-decoration: none; }
+  @page { margin: 1.2cm; }
 }

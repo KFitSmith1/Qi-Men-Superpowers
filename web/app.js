@@ -21,7 +21,28 @@ const LUOSHU_LAYOUT = [4, 9, 2, 3, 5, 7, 8, 1, 6];
 
 /* Five-element English labels for readability. */
 const EL_EN = { '木': 'Wood', '火': 'Fire', '土': 'Earth', '金': 'Metal', '水': 'Water' };
-const elLabel = (el) => el ? `<span class="el-label el-${esc(el)}">${esc(el)} ${esc(EL_EN[el] || '')}</span>` : '';
+
+/* Romanisation for the 10 Heavenly Stems and 12 Earthly Branches. */
+const PINYIN = {
+  '甲': 'Jia', '乙': 'Yi', '丙': 'Bing', '丁': 'Ding', '戊': 'Wu',
+  '己': 'Ji', '庚': 'Geng', '辛': 'Xin', '壬': 'Ren', '癸': 'Gui',
+  '子': 'Zi', '丑': 'Chou', '寅': 'Yin', '卯': 'Mao', '辰': 'Chen', '巳': 'Si',
+  '午': 'Wu', '未': 'Wei', '申': 'Shen', '酉': 'You', '戌': 'Xu', '亥': 'Hai',
+};
+/* Zodiac animal per Earthly Branch [English, 中文]. */
+const ANIMAL = {
+  '子': ['Rat', '鼠'], '丑': ['Ox', '牛'], '寅': ['Tiger', '虎'], '卯': ['Rabbit', '兔'],
+  '辰': ['Dragon', '龙'], '巳': ['Snake', '蛇'], '午': ['Horse', '马'], '未': ['Goat', '羊'],
+  '申': ['Monkey', '猴'], '酉': ['Rooster', '鸡'], '戌': ['Dog', '狗'], '亥': ['Pig', '猪'],
+};
+
+/* Circular five-element badge (colored ring + element glyph + English name). */
+const elBadge = (el) => el ? `<span class="el-badge el-${esc(el)}" data-el="${esc(el)}">${esc(EL_EN[el] || '')}</span>` : '';
+const pinyinOf = (ch) => esc(PINYIN[ch] || '');
+const branchSub = (ch) => {
+  const a = ANIMAL[ch];
+  return `${pinyinOf(ch)}${a ? ` · ${esc(a[1])} ${esc(a[0])}` : ''}`;
+};
 
 function setStatus(msg, isError) {
   const el = $('#status');
@@ -185,9 +206,11 @@ function renderBazi(r) {
       <h4>${esc(p.name)} ${esc(p.nameEn)}</h4>
       <div class="tg">${esc(p.tenGod)}${p.tenGod !== '日主' ? `<br><small>${esc(r.tenGodLegend[p.tenGod] || '')}</small>` : '<br><small>Day Master</small>'}</div>
       <div class="stem el-${esc(p.stemElement)}">${esc(p.stem)}</div>
-      ${elLabel(p.stemElement)}
+      <div class="pinyin">${pinyinOf(p.stem)}</div>
+      ${elBadge(p.stemElement)}
       <div class="branch el-${esc(p.branchElement)}">${esc(p.branch)}</div>
-      ${elLabel(p.branchElement)}
+      <div class="pinyin">${branchSub(p.branch)}</div>
+      ${elBadge(p.branchElement)}
       <div class="hidden">藏干 ${p.hiddenStems.map((h) => `<b class="el-${esc(h.element)}">${esc(h.stem)}</b><small>(${esc(h.tenGod)})</small>`).join(' ')}</div>
     </div>`).join('');
 
@@ -203,6 +226,7 @@ function renderBazi(r) {
     <div class="luck">
       <div class="age">${p.startAge}岁</div>
       <div class="gz"><span class="el-${esc(p.stemElement)}">${esc(p.stem)}</span><span class="el-${esc(p.branchElement)}">${esc(p.branch)}</span></div>
+      <div class="luck-py">${pinyinOf(p.stem)} ${pinyinOf(p.branch)}</div>
       <div>${esc(p.tenGod)}</div>
       <div class="yrs">${p.startYear}–${p.endYear}</div>
     </div>`).join('');
