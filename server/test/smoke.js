@@ -6,6 +6,9 @@
  */
 
 const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const qimen = require('../src/qimen');
 const { analyzeBazi } = require('../src/bazi');
 const { trueSolarTime, daysToJie } = require('../src/solar');
@@ -81,7 +84,48 @@ async function main() {
   await assert.rejects(() => analyzeBazi({ birth: BIRTH, gender: 'other' }), /gender/);
   console.log('✓ input validation');
 
+  await testRag();
+
   console.log('\nAll smoke tests passed.');
+}
+
+/* RAG: Obsidian loader -> hash embeddings -> local vector store -> retrieval.
+   Isolated to a temp dir with the offline hash embedder (no keys/network). */
+async function testRag() {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'qms-rag-'));
+  const vault = path.join(tmp, 'vault');
+  fs.mkdirSync(vault, { recursive: true });
+  fs.writeFileSync(path.join(vault, 'wealth.md'), '# Wealth Star\n\nDirect Wealth is steady salary income. Indirect Wealth is windfall and business profit money.');
+  fs.writeFileSync(path.join(vault, 'romance.md'), '# Romance\n\nThe spouse palace is the day branch and governs marriage and relationships.');
+
+  process.env.EMBEDDINGS_PROVIDER = 'hash';
+  process.env.VECTOR_STORE = 'local';
+  process.env.VECTOR_FILE = path.join(tmp, 'vectors.json');
+  // Require after env is set so module-level config picks it up.
+  const obsidian = require('../src/obsidian');
+  const embeddings = require('../src/embeddings');
+  const store = require('../src/vectorstore');
+
+  const items = obsidian.loadVault(vault);
+  assert.ok(items.length >= 2, `vault produced chunks, got ${items.length}`);
+  assert.ok(items.every((i) => i.id && i.text && i.meta.title), 'chunks carry id/text/meta');
+
+  const vectors = await embeddings.embed(items.map((i) => i.text));
+  assert.strictEqual(vectors.length, items.length);
+  assert.strictEqual(vectors[0].length, embeddings.HASH_DIM);
+  await store.upsert(items.map((s, j) => ({ id: s.id, vector: vectors[j], text: s.text, meta: s.meta })));
+  assert.strictEqual(await store.count(), items.length);
+
+  const q = await embeddings.embedOne('How is my wealth and income luck?');
+  const hits = await store.search(q, 2);
+  assert.strictEqual(hits[0].meta.title, 'wealth', `wealth query ranks wealth note first, got ${hits[0].meta.title}`);
+
+  // Idempotent upsert (re-ingest does not duplicate).
+  await store.upsert(items.map((s, j) => ({ id: s.id, vector: vectors[j], text: s.text, meta: s.meta })));
+  assert.strictEqual(await store.count(), items.length, 'upsert is idempotent by id');
+
+  fs.rmSync(tmp, { recursive: true, force: true });
+  console.log('✓ RAG pipeline (obsidian chunk -> embed -> store -> retrieve, idempotent)');
 }
 
 main().catch((e) => {

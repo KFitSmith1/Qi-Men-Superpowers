@@ -24,6 +24,8 @@ const path = require('path');
 const qimen = require('./qimen');
 const bazi = require('./bazi');
 const llm = require('./llm');
+const embeddings = require('./embeddings');
+const vectorstore = require('./vectorstore');
 const { trueSolarTime } = require('./solar');
 
 const PORT = Number(process.env.PORT || 8787);
@@ -193,9 +195,28 @@ async function handleChat(req, res) {
   req.on('close', () => ac.abort());
   try {
     send({ type: 'meta', provider: llm.PROVIDER });
+    const messages = Array.isArray(body.messages) ? body.messages : [];
+    const context = body.context || {};
+
+    // RAG: retrieve reference chunks for the latest user question.
+    const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+    if (lastUser && (await vectorstore.count()) !== 0) {
+      try {
+        const qvec = await embeddings.embedOne(lastUser.content);
+        const hits = await vectorstore.search(qvec, 6);
+        const useful = hits.filter((h) => h.score > 0.15);
+        if (useful.length) {
+          context.retrieved = useful.map((h) => `(${h.meta?.title || h.id}) ${h.text}`);
+          send({ type: 'sources', items: useful.map((h) => ({ title: h.meta?.title || h.id, score: Number(h.score.toFixed(3)) })) });
+        }
+      } catch (e) {
+        console.error(`[${new Date().toISOString()}] /api/chat retrieval:`, e.message);
+      }
+    }
+
     await llm.streamChat({
-      messages: Array.isArray(body.messages) ? body.messages : [],
-      context: body.context || {},
+      messages,
+      context,
       lang: body.lang || 'en',
       signal: ac.signal,
       onToken: (t) => send({ type: 'token', text: t }),

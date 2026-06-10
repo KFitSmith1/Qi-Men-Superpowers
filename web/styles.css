@@ -558,6 +558,8 @@ footer a:hover { text-decoration: underline; }
 #chat-send { background: var(--maroon); color: #fff; border-color: var(--maroon); font-size: 0.9rem; font-weight: 600; padding: 0.55rem 1rem; }
 #chat-send:disabled { opacity: 0.6; cursor: default; }
 #chat-speak.on { background: var(--gold); color: #fff; border-color: var(--gold); }
+.chat-sources { margin-top: 0.5rem; padding-top: 0.4rem; border-top: 1px dashed var(--border); font-size: 0.74rem; color: var(--muted); }
+.src-tag { display: inline-block; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 6px; padding: 0.05rem 0.4rem; margin: 0.1rem 0.2rem 0 0; }
 #chat-mic.listening { background: var(--red); color: #fff; border-color: var(--red); animation: micpulse 1s ease-in-out infinite; }
 @keyframes micpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.5); } 50% { box-shadow: 0 0 0 6px rgba(192, 57, 43, 0); } }
 

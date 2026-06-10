@@ -952,7 +952,14 @@ function renderChatLog() {
     log.innerHTML = `<div class="chat-empty">${bi('问点什么吧，例如：「我今年的财运如何？」', 'Ask anything — e.g. “What’s my wealth outlook this year?”')}</div>`;
     return;
   }
-  log.innerHTML = chatState.messages.map((m) => bubbleHtml(m.role, esc(m.content).replace(/\n/g, '<br>'))).join('');
+  log.innerHTML = chatState.messages.map((m) => {
+    let body = esc(m.content).replace(/\n/g, '<br>');
+    if (m.sources && m.sources.length) {
+      const tags = m.sources.map((s) => `<span class="src-tag">${esc(s.title)}</span>`).join('');
+      body += `<div class="chat-sources">${bi('参考', 'Sources')}: ${tags}</div>`;
+    }
+    return bubbleHtml(m.role, body);
+  }).join('');
   log.scrollTop = log.scrollHeight;
 }
 
@@ -1012,6 +1019,7 @@ async function sendChat(text) {
         if (!line) continue;
         let ev; try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
         if (ev.type === 'token') { chatState.messages[idx].content += ev.text; renderChatLog(); }
+        else if (ev.type === 'sources') { chatState.messages[idx].sources = ev.items; renderChatLog(); }
         else if (ev.type === 'error') { chatState.messages[idx].content += `\n[${ev.message}]`; renderChatLog(); }
       }
     }
