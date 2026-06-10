@@ -25,11 +25,13 @@ function setLang(lang) {
   document.querySelectorAll('#lang-switch button').forEach((b) =>
     b.classList.toggle('active', b.dataset.setlang === lang));
   refreshOptionLabels();
+  if (state.tab === 'chat' && document.getElementById('chat-panel')) renderChat();
 }
 
-const TABS = ['bazi', 'plate', 'caiguan', 'hunlian', 'xingge', 'event', 'zhanduan', 'yaoce', 'xunshijieyun', 'huaqizhen', 'yishenhuanjiang'];
+const TABS = ['bazi', 'plate', 'caiguan', 'hunlian', 'xingge', 'event', 'zhanduan', 'yaoce', 'xunshijieyun', 'huaqizhen', 'yishenhuanjiang', 'chat'];
 
 const TAB_LABELS = {
+  chat: { zh: '问答', en: 'Ask' },
   bazi: { zh: '八字', en: 'BaZi' },
   plate: { zh: '奇门盘', en: 'Plate' },
   caiguan: { zh: '财官诊断', en: 'Wealth & Career' },
@@ -45,6 +47,10 @@ const TAB_LABELS = {
 
 /* What each tab does, calculates, and is for — shown atop every tab. */
 const TAB_INFO = {
+  chat: {
+    zh: '用语音或文字向解读助手提问，它会结合你已计算的命盘与参考资料给出口语化解读。说话用麦克风按钮，回复可朗读。仅供文化研究与娱乐参考。',
+    en: 'Ask the interpreter by voice or text. It answers conversationally, grounded in your computed chart and reference material. Tap the mic to speak; replies can be read aloud. For cultural study and entertainment only.',
+  },
   bazi: {
     zh: '由出生日期与时间排出四柱八字，推算日主强弱（旺相休囚死 + 支持率）、五行平衡、十神配置与十年大运。这是长期命理的基础蓝图，其余奇门模块均以此为参照。',
     en: 'Casts your Four Pillars (BaZi) from the birth date & time, then calculates Day-Master strength (seasonal state + support ratio), five-element balance, Ten-God roles and the 10-year Luck Pillars. This is your long-term destiny blueprint — the reference for every Qi Men module.',
@@ -851,6 +857,7 @@ function renderXunshi(r) {
 
 async function loadTab(tab) {
   const body = $('#tab-body');
+  if (tab === 'chat') { renderChat(); return; }
   const birth = getBirth();
   const eventTime = getEventTime();
   const needs = MODULE_NEEDS[tab] || (tab === 'bazi' || tab === 'plate' ? ['birth'] : []);
@@ -899,6 +906,7 @@ async function loadTab(tab) {
         if (plate && r.plateId) html += plateMeta(plate) + renderPlateGrid(plate, r.plateId) + '<br>';
         html += formatReading(r.text);
       }
+      if (r && r.text) captureReadingContext(tab, r.text);
     }
     body.innerHTML = html;
   } catch (e) {
@@ -910,6 +918,154 @@ function activateTab(tab) {
   document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
   state.tab = tab;
   loadTab(tab);
+}
+
+/* ---------------- Chat (Ask) tab ---------------- */
+
+const chatState = { messages: [], streaming: false, speak: false };
+
+/* The latest computed reading text, captured so chat can ground answers in it. */
+let lastReadingContext = null;
+function captureReadingContext(tab, text) {
+  if (text) lastReadingContext = { tab, text };
+}
+
+function chatContext() {
+  const ctx = { lang: document.body.dataset.lang };
+  const birth = getBirth();
+  if (birth) ctx.birth = birth;
+  ctx.gender = $('#gender')?.value;
+  const ev = getEventTime();
+  if (ev) ctx.eventTime = ev;
+  if (lastReadingContext) { ctx.tab = lastReadingContext.tab; ctx.chartText = lastReadingContext.text; }
+  return ctx;
+}
+
+function bubbleHtml(role, html) {
+  return `<div class="chat-msg ${role}"><div class="chat-bubble">${html}</div></div>`;
+}
+
+function renderChatLog() {
+  const log = $('#chat-log');
+  if (!log) return;
+  if (!chatState.messages.length) {
+    log.innerHTML = `<div class="chat-empty">${bi('问点什么吧，例如：「我今年的财运如何？」', 'Ask anything — e.g. “What’s my wealth outlook this year?”')}</div>`;
+    return;
+  }
+  log.innerHTML = chatState.messages.map((m) => bubbleHtml(m.role, esc(m.content).replace(/\n/g, '<br>'))).join('');
+  log.scrollTop = log.scrollHeight;
+}
+
+function renderChat() {
+  const speechOk = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  const ttsOk = !!window.speechSynthesis;
+  const t = (zh, en) => (document.body.dataset.lang === 'zh' ? zh : en); // plain text for attributes
+  $('#tab-body').innerHTML = tabHeading('chat') + `
+    <div id="chat-panel">
+      <div id="chat-log"></div>
+      <form id="chat-form" autocomplete="off">
+        <textarea id="chat-input" rows="1" placeholder="${t('输入问题，回车发送…', 'Type a question, Enter to send…')}"></textarea>
+        ${speechOk ? `<button type="button" id="chat-mic" title="${t('语音输入', 'Voice input')}" aria-label="voice">🎤</button>` : ''}
+        ${ttsOk ? `<button type="button" id="chat-speak" class="${chatState.speak ? 'on' : ''}" title="${t('朗读回复', 'Read replies aloud')}" aria-label="speak">🔊</button>` : ''}
+        <button type="submit" id="chat-send">${bi('发送', 'Send')}</button>
+      </form>
+    </div>`;
+  renderChatLog();
+
+  const form = $('#chat-form');
+  const input = $('#chat-input');
+  input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 140) + 'px'; });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
+  form.addEventListener('submit', (e) => { e.preventDefault(); sendChat(input.value); input.value = ''; input.style.height = 'auto'; });
+  if (ttsOk) $('#chat-speak').addEventListener('click', () => { chatState.speak = !chatState.speak; $('#chat-speak').classList.toggle('on', chatState.speak); if (!chatState.speak) window.speechSynthesis.cancel(); });
+  if (speechOk) $('#chat-mic').addEventListener('click', startDictation);
+}
+
+async function sendChat(text) {
+  const q = String(text || '').trim();
+  if (!q || chatState.streaming) return;
+  chatState.messages.push({ role: 'user', content: q });
+  chatState.messages.push({ role: 'assistant', content: '' });
+  const idx = chatState.messages.length - 1;
+  chatState.streaming = true;
+  renderChatLog();
+  setChatBusy(true);
+
+  try {
+    const res = await fetch(apiUrl('/api/chat'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: chatState.messages.slice(0, -1), context: chatContext(), lang: document.body.dataset.lang }),
+    });
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf('\n\n')) >= 0) {
+        const chunk = buf.slice(0, nl); buf = buf.slice(nl + 2);
+        const line = chunk.split('\n').find((l) => l.startsWith('data:'));
+        if (!line) continue;
+        let ev; try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
+        if (ev.type === 'token') { chatState.messages[idx].content += ev.text; renderChatLog(); }
+        else if (ev.type === 'error') { chatState.messages[idx].content += `\n[${ev.message}]`; renderChatLog(); }
+      }
+    }
+  } catch (e) {
+    chatState.messages[idx].content += (chatState.messages[idx].content ? '\n' : '') + `⚠ ${e.message}`;
+    renderChatLog();
+  } finally {
+    chatState.streaming = false;
+    setChatBusy(false);
+    const reply = chatState.messages[idx].content;
+    if (chatState.speak && reply) speak(reply);
+  }
+}
+
+function setChatBusy(busy) {
+  const send = $('#chat-send');
+  if (send) { send.disabled = busy; send.innerHTML = busy ? '…' : bi('发送', 'Send'); }
+}
+
+/* ---- Voice: Web Speech API (free, client-side) ---- */
+function ttsLang() { const l = document.body.dataset.lang; return l === 'zh' ? 'zh-CN' : 'en-US'; }
+
+function speak(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text.replace(/[#*_`>]/g, ''));
+  u.lang = ttsLang();
+  const v = window.speechSynthesis.getVoices().find((vo) => vo.lang && vo.lang.startsWith(u.lang.slice(0, 2)));
+  if (v) u.voice = v;
+  window.speechSynthesis.speak(u);
+}
+
+function startDictation() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  const mic = $('#chat-mic');
+  const rec = new SR();
+  rec.lang = ttsLang();
+  rec.interimResults = true;
+  rec.continuous = false;
+  let finalText = '';
+  mic.classList.add('listening');
+  rec.onresult = (e) => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) finalText += t; else interim += t;
+    }
+    const input = $('#chat-input');
+    if (input) input.value = (finalText + interim).trim();
+  };
+  rec.onerror = () => mic.classList.remove('listening');
+  rec.onend = () => { mic.classList.remove('listening'); const input = $('#chat-input'); if (input) input.focus(); };
+  rec.start();
 }
 
 /* ---------------- Home / module guide ---------------- */
@@ -985,7 +1141,8 @@ async function init() {
   setLang(lang);
 
   for (const id of ['birth-date', 'birth-time', 'gender', 'event-date', 'event-time', 'question', 'topic', 'yixiang', 'longitude', 'tz-offset', 'tianqin']) {
-    document.getElementById(id).addEventListener('change', () => loadTab(state.tab));
+    // Don't wipe an in-progress conversation when inputs change.
+    document.getElementById(id).addEventListener('change', () => { if (state.tab !== 'chat') loadTab(state.tab); });
   }
 
   renderHome();

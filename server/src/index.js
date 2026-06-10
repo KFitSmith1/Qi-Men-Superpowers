@@ -23,6 +23,7 @@ const path = require('path');
 
 const qimen = require('./qimen');
 const bazi = require('./bazi');
+const llm = require('./llm');
 const { trueSolarTime } = require('./solar');
 
 const PORT = Number(process.env.PORT || 8787);
@@ -173,6 +174,43 @@ function serveStatic(req, res) {
   });
 }
 
+/** Streaming chat over SSE. Body: { messages:[{role,content}], context?, lang? } */
+async function handleChat(req, res) {
+  let body;
+  try {
+    body = await readBody(req);
+  } catch (err) {
+    return sendJson(res, err.status || 400, { error: err.message });
+  }
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'Access-Control-Allow-Origin': CORS_ORIGIN,
+  });
+  const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
+  const ac = new AbortController();
+  req.on('close', () => ac.abort());
+  try {
+    send({ type: 'meta', provider: llm.PROVIDER });
+    await llm.streamChat({
+      messages: Array.isArray(body.messages) ? body.messages : [],
+      context: body.context || {},
+      lang: body.lang || 'en',
+      signal: ac.signal,
+      onToken: (t) => send({ type: 'token', text: t }),
+    });
+    send({ type: 'done' });
+  } catch (err) {
+    if (!ac.signal.aborted) {
+      console.error(`[${new Date().toISOString()}] /api/chat:`, err.message);
+      send({ type: 'error', message: err.message });
+    }
+  } finally {
+    res.end();
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   // CORS preflight — lets a browser on a different origin call the JSON API.
   if (req.method === 'OPTIONS') {
@@ -185,7 +223,14 @@ const server = http.createServer(async (req, res) => {
     res.end();
     return;
   }
-  const routeKey = `${req.method} ${req.url.split('?')[0]}`;
+  const reqPath = req.url.split('?')[0];
+
+  // Streaming chat endpoint (Server-Sent Events) — handled outside the JSON routes.
+  if (req.method === 'POST' && reqPath === '/api/chat') {
+    return handleChat(req, res);
+  }
+
+  const routeKey = `${req.method} ${reqPath}`;
   const handler = routes[routeKey];
   if (!handler) {
     if (req.method === 'GET' || req.method === 'HEAD') return serveStatic(req, res);
