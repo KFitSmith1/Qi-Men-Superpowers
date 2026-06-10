@@ -414,12 +414,15 @@ const WANWU_EN = {
   '女装大佬': 'cross-dresser', '妖人': 'enchanter', '阴柔男性': 'soft-natured man', '骚女': 'flirtatious woman',
 };
 Object.assign(EN_VOCAB, WANWU_EN);
+if (window.QMS_TERMS_EN) Object.assign(EN_VOCAB, window.QMS_TERMS_EN);
+if (window.QMS_KEY_EN) Object.assign(KEY_EN, window.QMS_KEY_EN);
 const EN_VOCAB_MAXLEN = Math.max(...Object.keys(EN_VOCAB).map((k) => k.length));
 
-/* Translate one list term: exact match first, then segmentation. */
+/* Translate one list term: exact match first, then STRICT segmentation —
+   a term is fully English or stays fully Chinese, never a hybrid. */
 function cnEnTerm(t) {
   if (EN_VOCAB[t] !== undefined) return EN_VOCAB[t];
-  return cnEn(t);
+  return cnEn(t, true);
 }
 
 /* Comma-separated correspondence lists → per-term translation. Unknown terms
@@ -428,7 +431,11 @@ function cnEnList(val) {
   const whole = String(val).trim();
   if (EN_VOCAB[whole] !== undefined) return EN_VOCAB[whole];   // short single values (北, 胎, 冬…)
   const parts = String(val).split(/[,，、]/).map((s) => s.trim()).filter(Boolean);
-  if (parts.length < 3) return cnEn(val);
+  if (parts.length < 3) {
+    // short values: strict per-part, else loose only for longer prose
+    if (whole.length <= 8) return cnEn(whole, true);
+    return cnEn(whole);
+  }
   let hit = 0;
   const out = parts.map((p) => {
     const e = cnEnTerm(p);
@@ -440,8 +447,10 @@ function cnEnList(val) {
 }
 
 /* Translate a line via EN_FIXED, else longest-match glossary segmentation.
-   Returns null when coverage of CJK characters is too low to be useful. */
-function cnEn(s) {
+   Loose mode tolerates partial coverage (long prose); strict mode requires
+   every CJK character to translate — used for list terms so the output is
+   either fully English or cleanly left in Chinese, never a hybrid. */
+function cnEn(s, strict) {
   const t = String(s).trim();
   if (!t) return null;
   if (EN_FIXED[t]) return EN_FIXED[t];
@@ -459,12 +468,16 @@ function cnEn(s) {
       i += hit.length;
     } else {
       const ch = t[i];
-      if (/[一-鿿]/.test(ch)) total += 1;
+      if (/[一-鿿]/.test(ch)) {
+        if (strict) return null;
+        total += 1;
+      }
       out += ch;
       i += 1;
     }
   }
-  if (total < 2 || covered / total < 0.55) return null;
+  if (!strict && (total < 2 || covered / total < 0.55)) return null;
+  if (strict && covered === 0) return null;
   return out
     .replace(/，/g, ', ').replace(/。/g, '. ').replace(/：/g, ': ')
     .replace(/（/g, ' (').replace(/）/g, ') ').replace(/、/g, ', ')
