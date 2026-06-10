@@ -154,7 +154,7 @@ function renderPlateGrid(plate, plateId) {
     </div>`;
   }).join('');
 
-  return `<div class="grid9" data-plate-id="${esc(plateId || '')}">${cells}</div>
+  return `<div class="grid9" data-plate-id="${esc(plateId || '')}" translate="no">${cells}</div>
   <div class="legend">
     <span>◆ 金框 = 值符宫 zhifu</span><span>◆ 蓝框 = 值使宫 zhishi</span>
     <span>右列大字 = 天盘干/地盘干 heaven & earth stems</span>
@@ -164,7 +164,7 @@ function renderPlateGrid(plate, plateId) {
 
 function plateMeta(plate) {
   const sz = plate.si_zhu;
-  return `<div class="plate-meta">
+  return `<div class="plate-meta" translate="no">
     <span>四柱 Pillars: <b>${esc(sz.year)} ${esc(sz.month)} ${esc(sz.day)} ${esc(sz.hour)}</b></span>
     <span>局 Ju: <b>${esc(plate.ju.type)}${plate.ju.number}局 ${esc(plate.ju.yuan)}</b></span>
     <span>空亡 Void: <b>${plate.kong_wang.map((k) => esc(k.branch)).join(' ')}</b></span>
@@ -238,9 +238,9 @@ function renderBazi(r) {
     : '<p class="hint">配置 ASTROLOGY_API_KEY 可启用 Astrology-API.io 高精度核验。Set ASTROLOGY_API_KEY to enable the precision API.</p>';
 
   return `${solarNote(r)}
-    <div class="pillars">${pillarCards}</div>
+    <div class="pillars" translate="no">${pillarCards}</div>
     <div class="section-block">
-      <h3>日主 Day Master · ${esc(r.dayMaster.stem)} ${esc(r.dayMaster.polarity)}${esc(r.dayMaster.element)} (${esc(r.dayMaster.elementEn)})</h3>
+      <h3><span translate="no">日主 Day Master · ${esc(r.dayMaster.stem)} ${esc(r.dayMaster.polarity)}${esc(r.dayMaster.element)}</span> (${esc(r.dayMaster.elementEn)})</h3>
       <table class="kv">
         <tr><td>月令状态 Seasonal state</td><td>${esc(r.strength.seasonalState)}</td></tr>
         <tr><td>强弱 Strength</td><td>${esc(r.strength.verdict)} (${esc(r.strength.verdictEn)}) — support ratio ${r.strength.supportRatio}</td></tr>
@@ -250,7 +250,7 @@ function renderBazi(r) {
     <div class="section-block"><h3>五行平衡 Five Elements Balance</h3><div class="elem-bars">${bars}</div></div>
     <div class="section-block">
       <h3>大运 10-Year Luck Pillars · ${esc(lp.direction)} (${esc(lp.directionEn)}) · 起运 ${lp.startAge} 岁（参照节气 ${esc(lp.referenceTerm)}）</h3>
-      <div class="luck-row">${luckCards}</div>
+      <div class="luck-row" translate="no">${luckCards}</div>
       <p class="hint">起运岁数按「3 日 = 1 年」由出生到节气的天数推算（节气取近似公式，误差 ≤1 天）。</p>
     </div>
     ${ext}
@@ -274,7 +274,7 @@ function renderXunshi(r) {
   return `<div class="section-block">
     <h3>最优时辰排行 Top Time Windows（六害越少越吉）</h3>
     ${r.data.best ? `<p>最优课 Best: <b>第${r.data.best.index}课 ${esc(r.data.best.ganzhi)}</b>（六害 ${r.data.best.liuhaiCount}）</p>` : ''}
-    <table class="lesson-table"><tr><th>课 Lesson</th><th>干支 Ganzhi</th><th>六害数 Harm count</th></tr>${rows}</table>
+    <table class="lesson-table" translate="no"><tr><th>课 Lesson</th><th>干支 Ganzhi</th><th>六害数 Harm count</th></tr>${rows}</table>
   </div>`;
 }
 
