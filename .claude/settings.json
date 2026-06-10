@@ -1,7 +1,7 @@
 {
   "sandbox": {
     "network": {
-      "allowedDomains": ["here.now"]
+      "allowedDomains": ["here.now", "*.here.now"]
     }
   }
 }
