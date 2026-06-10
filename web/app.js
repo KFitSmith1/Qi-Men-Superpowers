@@ -19,6 +19,10 @@ const TAB_LABELS = {
 /* Luoshu spatial arrangement: grid order top-left → bottom-right. */
 const LUOSHU_LAYOUT = [4, 9, 2, 3, 5, 7, 8, 1, 6];
 
+/* Five-element English labels for readability. */
+const EL_EN = { '木': 'Wood', '火': 'Fire', '土': 'Earth', '金': 'Metal', '水': 'Water' };
+const elLabel = (el) => el ? `<span class="el-label el-${esc(el)}">${esc(el)} ${esc(EL_EN[el] || '')}</span>` : '';
+
 function setStatus(msg, isError) {
   const el = $('#status');
   el.textContent = msg || '';
@@ -181,7 +185,9 @@ function renderBazi(r) {
       <h4>${esc(p.name)} ${esc(p.nameEn)}</h4>
       <div class="tg">${esc(p.tenGod)}${p.tenGod !== '日主' ? `<br><small>${esc(r.tenGodLegend[p.tenGod] || '')}</small>` : '<br><small>Day Master</small>'}</div>
       <div class="stem el-${esc(p.stemElement)}">${esc(p.stem)}</div>
+      ${elLabel(p.stemElement)}
       <div class="branch el-${esc(p.branchElement)}">${esc(p.branch)}</div>
+      ${elLabel(p.branchElement)}
       <div class="hidden">藏干 ${p.hiddenStems.map((h) => `<b class="el-${esc(h.element)}">${esc(h.stem)}</b><small>(${esc(h.tenGod)})</small>`).join(' ')}</div>
     </div>`).join('');
 
