@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>奇门超能 · Qi Men Superpowers — BaZi × Qi Men Dun Jia</title>
+<meta name="description" content="八字命理 × 奇门遁甲 — BaZi destiny analysis meets Qi Men Dun Jia time-space strategy. Open-source bilingual web application.">
+<style>
+:root {
+  --bg: #100e17;
+  --bg-panel: #1a1726;
+  --bg-cell: #211d31;
+  --border: #3a3354;
+  --gold: #d4af6a;
+  --gold-bright: #f0cd8a;
+  --text: #e8e3d8;
+  --muted: #9a92a8;
+  --red: #e06c5f;
+  --green: #7fb86b;
+  --blue: #6da3d8;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", Georgia, serif;
+  line-height: 1.6;
+}
+a { color: var(--blue); }
+a:hover { color: var(--gold-bright); }
+
+header {
+  text-align: center;
+  padding: 3.2rem 1rem 2.4rem;
+  background: radial-gradient(ellipse at top, #241e38 0%, var(--bg) 75%);
+  border-bottom: 1px solid var(--border);
+}
+header h1 { margin: 0; font-size: 2.6rem; color: var(--gold-bright); letter-spacing: 0.18em; }
+header .sub { display: block; font-size: 1.1rem; color: var(--muted); letter-spacing: 0.08em; margin-top: 0.4rem; }
+.tagline { margin: 1rem auto 0; color: var(--muted); font-size: 1rem; max-width: 42rem; }
+.cta { margin-top: 1.6rem; }
+.cta a {
+  display: inline-block; margin: 0.3rem 0.4rem; padding: 0.55rem 1.4rem;
+  border-radius: 22px; text-decoration: none; font-size: 0.95rem;
+}
+.cta .primary { background: var(--gold); color: #1d1830; font-weight: bold; }
+.cta .primary:hover { background: var(--gold-bright); color: #1d1830; }
+.cta .secondary { border: 1px solid var(--border); color: var(--text); }
+.cta .secondary:hover { border-color: var(--gold); color: var(--gold-bright); }
+
+main { max-width: 1080px; margin: 0 auto; padding: 0 1.2rem 2rem; }
+section { margin: 2.6rem 0; }
+h2 { color: var(--gold); font-size: 1.4rem; letter-spacing: 0.06em; }
+h2 .en { font-size: 0.95rem; color: var(--muted); font-weight: normal; margin-left: 0.5em; }
+
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+@media (max-width: 800px) { .cols { grid-template-columns: 1fr; } }
+.panel {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.2rem 1.4rem;
+}
+.panel h3 { margin: 0 0 0.6rem; color: var(--gold-bright); font-size: 1.1rem; }
+.panel ul { margin: 0; padding-left: 1.2rem; }
+.panel li { margin-bottom: 0.45rem; font-size: 0.92rem; }
+.panel li .en { color: var(--muted); font-size: 0.85rem; }
+
+/* decorative nine-palace plate */
+.plate-wrap { display: flex; justify-content: center; margin: 1.4rem 0; }
+.plate {
+  display: grid; grid-template-columns: repeat(3, minmax(86px, 130px));
+  gap: 6px;
+}
+.cell {
+  aspect-ratio: 1; background: var(--bg-cell); border: 1px solid var(--border);
+  border-radius: 10px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 0.15rem;
+  font-size: clamp(0.62rem, 1.8vw, 0.8rem); color: var(--muted);
+}
+.cell b { color: var(--text); font-size: clamp(0.78rem, 2.2vw, 1rem); }
+.cell .palace { color: var(--gold); letter-spacing: 0.1em; }
+.cell.center { background: radial-gradient(circle, #2a2440 0%, var(--bg-cell) 80%); }
+.cell.center b { color: var(--gold-bright); font-size: clamp(0.95rem, 2.6vw, 1.25rem); letter-spacing: 0.12em; }
+.cell .gate { color: var(--green); }
+.cell .star { color: var(--blue); }
+.cell .deity { color: var(--red); }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--gold); font-weight: normal; white-space: nowrap; }
+td:first-child, th:first-child { white-space: nowrap; }
+td .en { color: var(--muted); font-size: 0.84rem; }
+
+pre {
+  background: var(--bg-cell); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; overflow-x: auto; font-size: 0.88rem; color: var(--gold-bright);
+}
+pre .c { color: var(--muted); }
+
+footer {
+  border-top: 1px solid var(--border); margin-top: 2rem;
+  padding: 1.4rem 1rem 2rem; text-align: center;
+  font-size: 0.84rem; color: var(--muted);
+}
+footer p { margin: 0.35rem 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>奇门超能<span class="sub">Qi Men Superpowers</span></h1>
+  <p class="tagline">八字命理 × 奇门遁甲 — 长期命运分析与短期时空策略，合于一个界面。<br>
+  BaZi destiny analysis meets Qi Men Dun Jia time-space strategy, in one open-source bilingual application.</p>
+  <div class="cta">
+    <a class="primary" href="https://github.com/KFitSmith1/Qi-Men-Superpowers" target="_blank" rel="noopener">GitHub 源码 · Source</a>
+    <a class="secondary" href="#quick-start">本地运行 · Run locally</a>
+  </div>
+</header>
+
+<main>
+
+<section>
+  <div class="plate-wrap" aria-hidden="true">
+    <div class="plate">
+      <div class="cell"><span class="palace">巽四</span><span class="deity">九天</span><span class="star">天辅</span><span class="gate">杜门</span><b>辛</b></div>
+      <div class="cell"><span class="palace">离九</span><span class="deity">九地</span><span class="star">天英</span><span class="gate">景门</span><b>乙</b></div>
+      <div class="cell"><span class="palace">坤二</span><span class="deity">玄武</span><span class="star">天芮</span><span class="gate">死门</span><b>己</b></div>
+      <div class="cell"><span class="palace">震三</span><span class="deity">值符</span><span class="star">天冲</span><span class="gate">伤门</span><b>戊</b></div>
+      <div class="cell center"><span class="palace">中五</span><b>奇门遁甲</b><span>时家转盘 · 置闰法</span></div>
+      <div class="cell"><span class="palace">兑七</span><span class="deity">白虎</span><span class="star">天柱</span><span class="gate">惊门</span><b>丁</b></div>
+      <div class="cell"><span class="palace">艮八</span><span class="deity">螣蛇</span><span class="star">天任</span><span class="gate">生门</span><b>壬</b></div>
+      <div class="cell"><span class="palace">坎一</span><span class="deity">太阴</span><span class="star">天蓬</span><span class="gate">休门</span><b>癸</b></div>
+      <div class="cell"><span class="palace">乾六</span><span class="deity">六合</span><span class="star">天心</span><span class="gate">开门</span><b>丙</b></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>功能<span class="en">Features</span></h2>
+  <div class="cols">
+    <div class="panel">
+      <h3>八字 BaZi · Four Pillars</h3>
+      <ul>
+        <li>四柱排盘（年月日时干支）<br><span class="en">Four Pillars chart, computed from the engine's own calendar math so BaZi and Qi Men always agree</span></li>
+        <li>藏干 · 十神<br><span class="en">Hidden stems and Ten Gods with English names</span></li>
+        <li>五行平衡（含藏干加权）<br><span class="en">Five-Elements balance with hidden-stem weighting</span></li>
+        <li>日主旺衰（旺相休囚死 + 帮扶比）<br><span class="en">Day Master strength from seasonal state and support ratio</span></li>
+        <li>十年大运（起运岁数依节气）<br><span class="en">10-year Luck Pillars with direction and starting age from solar terms</span></li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>奇门遁甲 Qi Men Dun Jia</h3>
+      <ul>
+        <li>交互式九宫盘：出生局与问事局<br><span class="en">Interactive nine-palace plates: deities, stars, gates, heaven/earth stems, twelve states</span></li>
+        <li>条件标记：空亡 · 驿马 · 击刑 · 门迫 · 入墓 · 伏吟 · 反吟，值符/值使高亮<br><span class="en">Condition markers with duty chief/envoy highlighted</span></li>
+        <li>点击任一宫位查看万物类象<br><span class="en">Click any palace for full Wan Wu correspondences</span></li>
+        <li>真太阳时校正（经度 + 均时差）<br><span class="en">True solar time correction before plate setting</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>九大分析模块<span class="en">Nine analysis modules</span></h2>
+  <table>
+    <tr><th>财官</th><td>七大破财信号、六害检测、月令关系、行业取象<br><span class="en">Wealth &amp; Career — seven wealth hazards, six-harm detection, industry symbols</span></td></tr>
+    <tr><th>婚恋</th><td>伴侣干合、桃花、孤辰寡宿格局<br><span class="en">Romance — partner combinations, peach-blossom, lonely-star patterns</span></td></tr>
+    <tr><th>性格</th><td>日干宫与时干宫推内外性格<br><span class="en">Personality — inner/outer character from day &amp; hour stem palaces</span></td></tr>
+    <tr><th>问事</th><td>事业 / 求财 / 婚姻感情 / 疾病健康 / 出行 / 官司 / 寻人寻物 / 天气 / 家宅风水<br><span class="en">Event reading — nine standard question types from an event plate</span></td></tr>
+    <tr><th>占断</th><td>《奇门指归》古法断语逐条核验<br><span class="en">Divination — ancient Qi Men Zhi Gui judgment rules evaluated against the plate</span></td></tr>
+    <tr><th>遥测</th><td>跨盘感应：出生局保护干置入问事局<br><span class="en">Yaoce — cross-plate sensing of birth-plate protected stems</span></td></tr>
+    <tr><th>寻时</th><td>六十甲子变盘按六害数排序，择最佳时间窗<br><span class="en">Timing — 60 Gan-Zhi variant plates ranked to find the best time windows</span></td></tr>
+    <tr><th>化气阵</th><td>逐宫布阵方案，压制不利能量<br><span class="en">Array — per-palace placement plans to suppress harmful energies</span></td></tr>
+    <tr><th>移神换将</th><td>移除 · 合化 · 泄耗 · 冲克四类化解<br><span class="en">Remedy — transformation remedies: removal, combination, drainage, clash</span></td></tr>
+  </table>
+</section>
+
+<section id="quick-start">
+  <h2>快速开始<span class="en">Quick start</span></h2>
+  <p>本页为项目主页；完整应用需在本地运行（前端调用 Node.js API，API 包装纯 Bash 奇门引擎）。<br>
+  <span style="color:var(--muted)">This page is the project home; the full app runs locally — the UI talks to a Node.js API
+  wrapping a pure-Bash Qi Men engine. Requires Node.js ≥ 18 and Bash; zero npm dependencies.</span></p>
+  <pre>git clone https://github.com/KFitSmith1/Qi-Men-Superpowers.git
+cd Qi-Men-Superpowers
+node server/src/index.js
+<span class="c"># → http://localhost:8787</span>
+
+<span class="c"># or with Docker:</span>
+docker compose up --build</pre>
+</section>
+
+</main>
+
+<footer>
+  <p>Engine: <a href="https://github.com/skyfiredao/qmenpowers" target="_blank" rel="noopener">qmenpowers</a> (GPL-3.0, pure Bash, 置闰法 · 时家转盘奇门) · optional <a href="https://astrology-api.io" target="_blank" rel="noopener">Astrology-API.io</a> precision mode</p>
+  <p>仅供文化研究与娱乐参考 · For cultural study and entertainment only — not professional advice.</p>
+</footer>
+
+</body>
+</html>
