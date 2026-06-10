@@ -276,7 +276,9 @@ main {
 }
 .palace .deity { color: var(--maroon); font-size: 0.95rem; font-weight: 600; font-family: var(--serif); }
 .palace .row { display: flex; justify-content: space-between; align-items: baseline; font-size: 1rem; margin-top: 0.3rem; }
-.palace .gan { font-size: 1.35rem; font-weight: 700; font-family: var(--serif); }
+.palace .gan { font-size: 1.35rem; font-weight: 700; font-family: var(--serif); text-align: center; }
+.palace .gan .gan-py { display: block; font-size: 0.5em; font-weight: 400; color: var(--muted); font-family: var(--sans); line-height: 1.1; }
+body[data-lang="zh"] .palace .gan .gan-py, body[data-lang="both"] .palace .gan .gan-py { display: none; }
 .palace .digan { opacity: 0.85; }
 .palace .marks { margin-top: 0.45rem; display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .mark {

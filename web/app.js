@@ -112,6 +112,13 @@ const TEN_GOD_EN = {
   '偏财': 'Indirect Wealth', '正财': 'Direct Wealth', '七杀': 'Seven Killings', '正官': 'Direct Officer',
   '偏印': 'Indirect Resource', '正印': 'Direct Resource', '日主': 'Day Master',
 };
+/* Per-symbol English names for the nine-palace grid (kept short for cells). */
+const PALACE_EN = { '坎1宫': 'Kan 1', '坤2宫': 'Kun 2', '震3宫': 'Zhen 3', '巽4宫': 'Xun 4', '中5宫': 'Center 5', '乾6宫': 'Qian 6', '兑7宫': 'Dui 7', '艮8宫': 'Gen 8', '离9宫': 'Li 9' };
+const DIR_EN = { '北': 'N', '东北': 'NE', '东': 'E', '东南': 'SE', '南': 'S', '西南': 'SW', '西': 'W', '西北': 'NW', '中': 'C' };
+const DEITY_EN = { '值符': 'Chief', '螣蛇': 'Serpent', '太阴': 'Moon', '六合': 'Harmony', '白虎': 'White Tiger', '玄武': 'Tortoise', '九地': 'Nine Earth', '九天': 'Nine Heaven', '勾陈': 'Hook', '朱雀': 'Phoenix' };
+const STAR_EN = { '天蓬': 'Tianpeng', '天任': 'Tianren', '天冲': 'Tianchong', '天辅': 'Tianfu', '天英': 'Tianying', '天芮': 'Tianrui', '天柱': 'Tianzhu', '天心': 'Tianxin', '天禽': 'Tianqin' };
+const GATE_EN = { '休门': 'Rest', '生门': 'Life', '伤门': 'Harm', '杜门': 'Block', '景门': 'View', '死门': 'Death', '惊门': 'Shock', '开门': 'Open' };
+const STAGE_EN = { '长生': 'Growth', '沐浴': 'Bath', '冠带': 'Adorn', '临官': 'Officer', '帝旺': 'Peak', '衰': 'Decline', '病': 'Sick', '死': 'Death', '墓': 'Tomb', '绝': 'Severed', '胎': 'Conceive', '养': 'Nurture' };
 const SEASON_EN = { '旺': 'Prosperous', '相': 'Assisted', '休': 'Resting', '囚': 'Trapped', '死': 'Dead' };
 const JU_EN = { '阳遁': 'Yang Dun', '阴遁': 'Yin Dun' };
 const YUAN_EN = { '上元': 'Upper Yuan', '中元': 'Middle Yuan', '下元': 'Lower Yuan' };
@@ -146,6 +153,19 @@ const KEY_EN = {
   '补象': 'Supplement image', '物象': 'Imagery', '化合': 'Combine', '化合物': 'Combining objects',
   '泄化': 'Drain', '灭象': 'Dissolve image', '危险': 'Danger', '原盘': 'Base chart',
   '问题类型': 'Question type', '分析盘面': 'Plate', '用乙': 'Use Yi', '用合': 'Use combination',
+  // Wan Wu correspondence categories
+  '宫位': 'Palace', '符号': 'Symbols', '九星': 'Star', '八门': 'Gate', '八神': 'Deity',
+  '十二长生': 'Twelve Stages', '地盘干': 'Earth stem', '五行阴阳': 'Element & polarity',
+  '方位': 'Direction', '季节': 'Season', '时段': 'Time of day', '颜色': 'Colours',
+  '数字': 'Numbers', '形态': 'Form', '概念': 'Concepts', '身体脏腑': 'Body & organs',
+  '身体': 'Body', '性格品质': 'Character traits', '体形': 'Physique', '得令失令': 'In / out of season',
+  '天象': 'Sky phenomena', '地理': 'Terrain & places', '人物': 'People', '动物': 'Animals',
+  '植物': 'Plants', '器物': 'Objects', '食物': 'Food', '疾病': 'Ailments', '事件': 'Events',
+  '其他': 'Other', '动植': 'Flora & fauna', '含义': 'Meaning', '味道': 'Taste',
+  '地理场所': 'Places', '室内类象': 'Indoor imagery', '坟外类象': 'Grave surroundings',
+  '时辰': 'Hour', '月份': 'Month', '生肖': 'Zodiac', '藏干': 'Hidden stems', '饮食': 'Food & drink',
+  '静物': 'Still objects', '屋宅': 'Dwellings', '行为': 'Behaviour', '原型': 'Archetype',
+  '性格': 'Character', '吉凶': 'Auspice', '名称': 'Name', '五行': 'Element',
 };
 const keyGloss = (label) => {
   if (KEY_EN[label]) return KEY_EN[label];
@@ -281,7 +301,143 @@ const EN_VOCAB = {
   '牛': 'ox', '鸡': 'rooster', '猴': 'monkey', '狗': 'dog', '猪': 'pig', '羊': 'goat',
   '龙': 'dragon', '马': 'horse', '兔': 'rabbit', '蛇': 'snake', '鼠': 'rat',
 };
+/* Wan Wu correspondence vocabulary — top terms across the engine's data
+   tables (body, people, places, objects, animals, traits, events…). Used for
+   term-by-term translation of comma-separated correspondence lists. */
+const WANWU_EN = {
+  // events & activities
+  '嫁娶': 'marriage', '出行': 'travel', '远行': 'long journeys', '开业': 'opening a business',
+  '经商': 'commerce', '求财': 'seeking wealth', '求官': 'seeking office', '诉讼': 'lawsuit',
+  '官司': 'lawsuit', '赌博': 'gambling', '辩论': 'debate', '竞争': 'competition', '考试': 'exams',
+  '婚姻': 'marriage', '谈判': 'negotiation', '讨债': 'debt collection', '上任': 'taking office',
+  '乔迁': 'moving home', '争吵': 'quarrel', '交通事故': 'traffic accident', '手术': 'surgery',
+  '打猎': 'hunting', '打斗': 'fighting', '养殖': 'husbandry', '营造': 'construction',
+  '行刑': 'executions', '保密': 'secrecy', '口舌是非': 'disputes & gossip', '口舌': 'gossip',
+  '虚惊': 'false alarm', '哭泣': 'weeping', '死亡': 'death', '胎产': 'pregnancy & birth',
+  '生育': 'childbirth', '阻碍': 'obstruction', '惊恐': 'fright', '信息': 'information',
+  '大吉': 'very auspicious', '秋占不利': 'unfavourable in autumn', '夏占不利': 'unfavourable in summer',
+  '春占不利': 'unfavourable in spring', '宫制门': 'palace controls gate', '受制': 'constrained',
+  '血光之灾': 'bloodshed calamity', '血光': 'bloodshed', '跌打损伤': 'bruises & sprains',
+  // body & ailments
+  '胃': 'stomach', '皮肤': 'skin', '骨骼': 'bones', '血液': 'blood', '胆': 'gallbladder',
+  '肺': 'lungs', '肌肉': 'muscles', '神经': 'nerves', '疾病': 'illness', '小肠': 'small intestine',
+  '大肠': 'large intestine', '膀胱': 'bladder', '腹部': 'abdomen', '眼': 'eyes', '牙齿': 'teeth',
+  '心脏': 'heart', '舌': 'tongue', '背': 'back', '肛门': 'anus', '手指': 'fingers', '头': 'head',
+  '口': 'mouth', '鼻': 'nose', '腹': 'belly', '脐': 'navel', '肾脏': 'kidneys', '经络': 'meridians',
+  '筋骨': 'sinews & bones', '咽喉': 'throat', '四肢': 'limbs', '骨髓': 'marrow', '骨': 'bones',
+  '额头': 'forehead', '面部': 'face', '血管': 'blood vessels', '腰': 'waist', '脾胃': 'spleen & stomach',
+  '脾': 'spleen', '脑': 'brain', '脊柱': 'spine', '肠': 'intestines', '肘': 'elbow', '耳': 'ears',
+  '精液': 'semen', '筋脉': 'sinew channels', '筋': 'sinews', '眼目': 'eyes', '生殖器': 'genitals',
+  '毛发': 'hair', '羽毛': 'feathers', '皮毛': 'fur', '眼睛': 'eyes', '手': 'hands',
+  '肺病': 'lung disease', '眼疾': 'eye ailments', '骨折': 'fractures', '高血压': 'hypertension',
+  '血液病': 'blood disorders', '脾胃病': 'spleen-stomach ailments', '肿瘤': 'tumours', '癌症': 'cancer',
+  // people
+  '军人': 'soldier', '医生': 'doctor', '农民': 'farmer', '律师': 'lawyer', '少女': 'young woman',
+  '盗贼': 'thief', '运动员': 'athlete', '歌手': 'singer', '文人': 'scholar', '教师': 'teacher',
+  '妇女': 'women', '名人': 'celebrity', '司机': 'driver', '军警': 'military & police',
+  '领导': 'leader', '长辈': 'elders', '艺术家': 'artist', '艺人': 'performer', '胎儿': 'fetus',
+  '演员': 'actor', '法官': 'judge', '巫师': 'shaman', '寡妇': 'widow', '外科医生': 'surgeon',
+  '僧道': 'monks & priests', '中介': 'brokers', '黑社会': 'underworld', '酒鬼': 'drunkard',
+  '老师': 'teacher', '水手': 'sailor', '执法者': 'law enforcer', '建筑师': 'architect',
+  '屠夫': 'butcher', '间谍': 'spy', '长官': 'officials', '贵人': 'benefactor', '谋士': 'strategist',
+  '说客': 'lobbyist', '设计师': 'designer', '警察': 'police', '公安': 'police', '公务员': 'civil servant',
+  '驾驶员': 'driver', '首领': 'chieftain', '飞行员': 'pilot', '领袖': 'leader', '矿工': 'miner',
+  '画家': 'painter', '男人': 'man', '老板': 'boss', '老妇人': 'old woman', '翻译': 'translator',
+  '美女': 'beautiful woman', '狱警': 'prison guard', '首都': 'capital city',
+  // places
+  '仓库': 'warehouse', '坟墓': 'grave', '寺庙': 'temple', '车站': 'station', '池塘': 'pond',
+  '地下室': 'basement', '监狱': 'prison', '道路': 'roads', '花园': 'garden', '娱乐场所': 'entertainment venues',
+  '厨房': 'kitchen', '厕所': 'toilet', '下水道': 'sewers', '银行': 'bank', '酒吧': 'bar',
+  '电影院': 'cinema', '法院': 'court', '沼泽': 'marsh', '战场': 'battlefield', '工地': 'construction site',
+  '医院': 'hospital', '闹市': 'busy streets', '酒店': 'hotel', '码头': 'docks', '田地': 'fields',
+  '洞穴': 'caves', '洗手间': 'washroom', '楼台': 'towers', '桥梁': 'bridges', '树林': 'woods',
+  '机场': 'airport', '暗处': 'dark places', '影院': 'cinema', '庭院': 'courtyard', '废墟': 'ruins',
+  '广场': 'plaza', '平原': 'plains', '寺院': 'monastery', '寺观': 'temples', '宫殿': 'palace hall',
+  '客厅': 'living room', '学校': 'school', '大路': 'main roads', '堤坝': 'dams', '坑': 'pits',
+  '化工厂': 'chemical plant', '公园': 'park', '高楼': 'tall buildings', '高岗': 'high mounds',
+  '高山': 'high mountains', '高原': 'plateau', '高亢之地': 'elevated ground', '饭店': 'restaurant',
+  '酒楼': 'restaurant', '荒地': 'wasteland', '竹林': 'bamboo grove', '窑灶': 'kilns & stoves',
+  '矿山': 'mines', '田园': 'farmland', '牢狱': 'imprisonment', '美容院': 'beauty salon',
+  '房地产': 'real estate', '门窗': 'doors & windows',
+  // objects
+  '文章': 'writings', '乐器': 'instruments', '首饰': 'jewellery', '珠宝': 'jewels', '音响': 'audio gear',
+  '飞机': 'aircraft', '车辆': 'vehicles', '镜子': 'mirrors', '锁': 'locks', '金银': 'gold & silver',
+  '衣服': 'clothing', '砖瓦': 'bricks & tiles', '电话': 'telephone', '电视': 'television',
+  '电器': 'appliances', '灯': 'lamps', '汽车': 'car', '床': 'bed', '布帛': 'cloth & silk',
+  '合同': 'contracts', '刀剑': 'knives & swords', '书籍': 'books', '鞭炮': 'firecrackers',
+  '钥匙': 'keys', '金银首饰': 'gold & silver jewellery', '醋': 'vinegar', '证件': 'documents & IDs',
+  '蜡烛': 'candles', '艺术品': 'artworks', '管道': 'pipes', '盐': 'salt', '水泥': 'cement',
+  '水沟': 'ditches', '水果': 'fruit', '旧物': 'old things', '文件': 'documents', '文书': 'paperwork',
+  '手术刀': 'scalpel', '布匹': 'cloth', '图画': 'pictures', '印章': 'seals', '饮料': 'beverages',
+  '陶器': 'pottery', '钱财': 'money', '钟表': 'clocks & watches', '金融': 'finance', '酒食': 'wine & food',
+  '财帛': 'wealth', '装饰': 'decoration', '葫芦': 'gourds', '茶': 'tea', '腰带': 'belts',
+  '窗帘': 'curtains', '神像': 'sacred statues', '神佛': 'deities & buddhas', '破损之物': 'damaged items',
+  '眼镜': 'spectacles', '瓦罐': 'clay pots', '珍宝': 'treasures', '玩具': 'toys', '化妆品': 'cosmetics',
+  '霓虹灯': 'neon lights', '炉灶': 'stove', '酒': 'alcohol', '食物': 'food', '野味': 'game meat',
+  '蔬菜': 'vegetables', '花生': 'peanuts', '地瓜': 'sweet potato', '土豆': 'potato', '高粱': 'sorghum',
+  // animals & plants
+  '鱼': 'fish', '鹰': 'eagle', '鳖': 'turtle', '驴': 'donkey', '猫': 'cat', '狼': 'wolf',
+  '鹿': 'deer', '鸭': 'duck', '虾': 'shrimp', '蚯蚓': 'earthworm', '萤火虫': 'firefly',
+  '狮子': 'lion', '狮': 'lion', '龟': 'tortoise', '鸟': 'birds', '天鹅': 'swan', '跳蚤': 'flea',
+  '蟹': 'crab', '蝙蝠': 'bat', '豹': 'leopard', '熊猫': 'panda', '花草': 'flowers & plants',
+  '灌木': 'shrubs', '苔藓': 'moss', '花': 'flowers', '芦苇': 'reeds', '绳索': 'ropes',
+  // traits
+  '固执': 'stubborn', '包容': 'tolerant', '光明': 'bright', '保守': 'conservative', '威严': 'dignified',
+  '聪明': 'clever', '柔顺': 'gentle', '急躁': 'impatient', '吝啬': 'stingy', '优柔寡断': 'indecisive',
+  '仁慈': 'benevolent', '阴险': 'devious', '积极进取': 'enterprising', '热情': 'passionate',
+  '智慧': 'wisdom', '守信': 'trustworthy', '多疑': 'suspicious', '刚健': 'vigorous',
+  '雷厉风行': 'swift & decisive', '重感情': 'sentimental', '豪放': 'bold & unrestrained',
+  '虚荣': 'vain', '自私': 'selfish', '自强不息': 'self-improving', '稳重': 'steady',
+  '神秘': 'mysterious', '美丽': 'beautiful', '爱表现': 'showy', '权威': 'authority',
+  // weather & nature
+  '阴天': 'overcast', '闪电': 'lightning', '霜雪': 'frost & snow', '阴云': 'dark clouds',
+  '龙卷风': 'tornado', '晴天': 'clear weather', '太阳': 'sun', '霜降': 'frost', '雾霾': 'smog',
+  '雾': 'fog', '雨': 'rain', '酷暑': 'scorching heat', '秋天': 'autumn',
+  // colours & misc
+  '黑': 'black', '蓝色': 'blue', '银白': 'silvery white', '黄土黄': 'earthy yellow', '青': 'green-blue',
+  '紫': 'purple', '白': 'white', '弯曲': 'curved', '青绿': 'verdant green', '亮绿': 'bright green',
+  '暗淡蓝': 'dim blue', '玄': 'dark mystic', '红': 'red', '黄': 'yellow', '蓝': 'blue', '绿': 'green',
+  '深色': 'dark tones', '圆润': 'rounded', '小': 'small', '直': 'straight', '方': 'square', '高': 'tall',
+  // seasons & times of day
+  '春': 'spring', '夏': 'summer', '秋': 'autumn', '冬': 'winter', '四季': 'all seasons',
+  '早晨': 'morning', '上午': 'forenoon', '中午': 'noon', '下午': 'afternoon', '黄昏': 'dusk',
+  '夜晚': 'night', '深夜': 'late night', '凌晨': 'pre-dawn', '傍晚': 'evening',
+  // romance / personality module words
+  '妖艳': 'seductive', '玉女': 'jade maiden', '阴柔': 'soft-natured', '温柔': 'gentle',
+  '如沐春风': 'like a spring breeze', '热辣': 'fiery', '男闺蜜': 'male confidant',
+  '猛男': 'macho man', '帅哥': 'handsome man', '海王': 'player', '渣男渣女': 'toxic partners',
+  '艳遇': 'romantic encounter', '奇遇': 'chance encounter', '一见钟情': 'love at first sight',
+  '梦中情人': 'dream lover', '性冲动': 'sexual impulse', '挑逗': 'flirtation', '乱道心': 'distracts the heart',
+  '点蜡烛': 'light a candle', '漂亮吊灯': 'pretty chandelier', '小花小草': 'small flowers & plants',
+  '器官': 'organs', '大小': 'size', '耐久力': 'stamina', '桃花': 'Peach Blossom', '人缘': 'popularity',
+  '媒': 'matchmaking', '婚': 'marriage', '恋': 'romance', '约': 'dates', '缘': 'affinity',
+  '女装大佬': 'cross-dresser', '妖人': 'enchanter', '阴柔男性': 'soft-natured man', '骚女': 'flirtatious woman',
+};
+Object.assign(EN_VOCAB, WANWU_EN);
 const EN_VOCAB_MAXLEN = Math.max(...Object.keys(EN_VOCAB).map((k) => k.length));
+
+/* Translate one list term: exact match first, then segmentation. */
+function cnEnTerm(t) {
+  if (EN_VOCAB[t] !== undefined) return EN_VOCAB[t];
+  return cnEn(t);
+}
+
+/* Comma-separated correspondence lists → per-term translation. Unknown terms
+   keep their hanzi (graceful fallback); below 40% coverage we give up. */
+function cnEnList(val) {
+  const whole = String(val).trim();
+  if (EN_VOCAB[whole] !== undefined) return EN_VOCAB[whole];   // short single values (北, 胎, 冬…)
+  const parts = String(val).split(/[,，、]/).map((s) => s.trim()).filter(Boolean);
+  if (parts.length < 3) return cnEn(val);
+  let hit = 0;
+  const out = parts.map((p) => {
+    const e = cnEnTerm(p);
+    if (e) { hit++; return e; }
+    return p;
+  });
+  if (hit / parts.length < 0.4) return null;
+  return out.join(', ');
+}
 
 /* Translate a line via EN_FIXED, else longest-match glossary segmentation.
    Returns null when coverage of CJK characters is too low to be useful. */
@@ -313,6 +469,7 @@ function cnEn(s) {
     .replace(/，/g, ', ').replace(/。/g, '. ').replace(/：/g, ': ')
     .replace(/（/g, ' (').replace(/）/g, ') ').replace(/、/g, ', ')
     .replace(/\s+([,):.])/g, '$1').replace(/\(\s+/g, '(')
+    .replace(/(\d)(?=[A-Z])/g, '$1 ')
     .replace(/\s{2,}/g, ' ').trim();
 }
 
@@ -386,6 +543,14 @@ function formatReading(raw) {
     const brk = trimmed.match(/^\[([^\]｜|]{2,10})\]$/);        // [出生局] style heads
     if (brk) { closeItem(); sectionBar(brk[1]); continue; }
 
+    const sym = trimmed.match(/^\[([^\]]{1,8})\]\s+(\S.*)$/);   // "[天干] 癸" symbol heads (wanwu)
+    if (sym) {
+      const zh = `${sym[1]} · ${sym[2]}`;
+      const en = [keyGloss(sym[1]) || cnEn(sym[1]), cnEn(sym[2])].filter(Boolean).join(' · ');
+      html += `<h5 class="rd-sub">${en ? bi(deco(zh), esc(en)) : deco(zh)}</h5>`;
+      continue;
+    }
+
     const bullet = trimmed.match(/^-\s+(.+)$/);                 // - affliction item
     if (bullet) {
       const en = cnEn(bullet[1]);
@@ -403,7 +568,7 @@ function formatReading(raw) {
       const g = keyGloss(label);
       const kHtml = g ? `<span class="has-en"><span class="zh">${deco(label)}</span><span class="k-en">${esc(g)}</span></span>` : deco(label);
       if (!val) html += `<div class="rd-kv-h" style="${indentRem(indent)}">${kHtml}</div>`;
-      else html += `<div class="rd-kv" style="${indentRem(indent)}"><span class="rd-k">${kHtml}</span><span class="rd-v">${rdPair(deco(val), cnEn(val))}</span></div>`;
+      else html += `<div class="rd-kv" style="${indentRem(indent)}"><span class="rd-k">${kHtml}</span><span class="rd-v">${rdPair(deco(val), cnEnList(val))}</span></div>`;
       continue;
     }
     html += `<div class="rd-line" style="${indentRem(indent)}">${rdPair(deco(trimmed), cnEn(trimmed))}</div>`;
@@ -492,7 +657,7 @@ function renderPlateGrid(plate, plateId) {
         <div class="center-info">
           <div class="ju">${bi(esc(plate.ju.type), esc(JU_EN[plate.ju.type] || plate.ju.type))} ${plate.ju.number}${bi('局', ' Ju')}</div>
           <div>${bi(esc(plate.ju.yuan), esc(YUAN_EN[plate.ju.yuan] || plate.ju.yuan))}${plate.ju.run ? bi(' · 置闰', ' · leap') : ''}</div>
-          <div>${bi('值符', 'Chief')} ${esc(plate.zhi_fu.star)} · ${bi('值使', 'Envoy')} ${esc(plate.zhi_shi.gate)}</div>
+          <div>${bi('值符', 'Chief')} ${bi(esc(plate.zhi_fu.star), esc(STAR_EN[plate.zhi_fu.star] || plate.zhi_fu.star))} · ${bi('值使', 'Envoy')} ${bi(esc(plate.zhi_shi.gate), esc(GATE_EN[plate.zhi_shi.gate] || plate.zhi_shi.gate))}</div>
           <div>${esc(plate.datetime)}</div>
         </div>
       </div>`;
@@ -501,18 +666,20 @@ function renderPlateGrid(plate, plateId) {
     const cls = ['palace'];
     if (n === zhifuPalace) cls.push('zhifu');
     if (n === zhishiPalace) cls.push('zhishi');
+    const ganCell = (gan, wuxing, extra) =>
+      `<span class="gan ${extra || ''} el-${esc(wuxing)}">${esc(gan)}<small class="en gan-py">${pinyinOf(gan)}</small></span>`;
     return `<div class="${cls.join(' ')}" data-palace="${n}" title="万物类象 Wan Wu correspondences">
-      <div class="pname">${esc(p.name)} ${esc(p.direction)}</div>
-      <div class="deity">${esc(p.deity)}</div>
+      <div class="pname">${bi(`${esc(p.name)} ${esc(p.direction)}`, `${esc(PALACE_EN[p.name] || p.name)} · ${esc(DIR_EN[p.direction] || p.direction)}`)}</div>
+      <div class="deity">${bi(esc(p.deity), esc(DEITY_EN[p.deity] || p.deity))}</div>
       <div class="row">
-        <span class="jixi-${esc(p.star_jixi)}">${esc(p.star)}${p.tianqin ? '<small>[寄禽]</small>' : ''}</span>
-        <span class="gan el-${esc(p.tian_gan_wuxing)}">${esc(p.tian_gan)}</span>
+        <span class="jixi-${esc(p.star_jixi)}">${bi(esc(p.star), esc(STAR_EN[p.star] || p.star))}${p.tianqin ? `<small>${bi('[寄禽]', '[+Qin]')}</small>` : ''}</span>
+        ${ganCell(p.tian_gan, p.tian_gan_wuxing)}
       </div>
       <div class="row">
-        <span class="jixi-${esc(p.gate_jixi)}">${esc(p.gate)}</span>
-        <span class="gan digan el-${esc(p.di_gan_wuxing)}">${esc(p.di_gan)}</span>
+        <span class="jixi-${esc(p.gate_jixi)}">${bi(esc(p.gate), esc(GATE_EN[p.gate] || p.gate))}</span>
+        ${ganCell(p.di_gan, p.di_gan_wuxing, 'digan')}
       </div>
-      <div class="row"><span class="hint">${esc(p.state || '')}</span></div>
+      <div class="row"><span class="hint">${p.state ? bi(esc(p.state), esc(STAGE_EN[p.state] || p.state)) : ''}</span></div>
       <div class="marks">${markBadges(p)}</div>
     </div>`;
   }).join('');
