@@ -1,7 +1,15 @@
 {
   "sandbox": {
     "network": {
-      "allowedDomains": ["here.now"]
+      "allowedDomains": [
+        "here.now",
+        "insforge.com",
+        "*.insforge.com",
+        "insforge.dev",
+        "*.insforge.dev",
+        "insforge.app",
+        "*.insforge.app"
+      ]
     }
   }
 }
