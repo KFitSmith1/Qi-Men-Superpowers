@@ -55,7 +55,15 @@ async function api(path, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const data = await res.json();
+  const text = await res.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(res.status === 404
+      ? '后端 API 不可用（静态部署无服务器）— backend API not available on this static deployment; run the server locally (see README)'
+      : `HTTP ${res.status}: ${text.slice(0, 120)}`);
+  }
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 }
