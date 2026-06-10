@@ -1,0 +1,11 @@
+services:
+  qi-men-superpowers:
+    build: .
+    ports:
+      - "8787:8787"
+    environment:
+      # Optional: enables Astrology-API.io high-precision BaZi verification.
+      # Without it the app uses its built-in local calculation.
+      - ASTROLOGY_API_KEY=${ASTROLOGY_API_KEY:-}
+      - ASTROLOGY_API_URL=${ASTROLOGY_API_URL:-}
+    restart: unless-stopped

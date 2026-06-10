@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>奇门超能 · Qi Men Superpowers — BaZi &amp; Qi Men Dun Jia</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <h1>奇门超能 <span class="sub">Qi Men Superpowers</span></h1>
+  <p class="tagline">八字命理 × 奇门遁甲 — BaZi destiny analysis meets Qi Men time-space strategy</p>
+</header>
+
+<main>
+  <aside id="controls">
+    <section class="panel">
+      <h2>出生信息 <span class="en">Birth Details</span></h2>
+      <label>出生日期 Birth date
+        <input type="date" id="birth-date" value="1990-05-15">
+      </label>
+      <label>出生时间 Birth time
+        <input type="time" id="birth-time" value="14:30">
+      </label>
+      <label>性别 Gender
+        <select id="gender">
+          <option value="male">男 Male</option>
+          <option value="female">女 Female</option>
+        </select>
+      </label>
+      <details>
+        <summary>真太阳时校正 True solar time</summary>
+        <label>经度 Longitude (east +)
+          <input type="number" id="longitude" step="0.01" min="-180" max="180" placeholder="e.g. 116.4 (Beijing)">
+        </label>
+        <label>时区 Clock UTC offset
+          <input type="number" id="tz-offset" step="0.5" min="-12" max="14" value="8">
+        </label>
+      </details>
+      <details>
+        <summary>天禽寄宫 Tianqin mode</summary>
+        <label>
+          <select id="tianqin">
+            <option value="follow-tiannei">随天芮 follow-tiannei（默认）</option>
+            <option value="jikun">寄坤二宫 jikun</option>
+            <option value="follow-zhifu">随值符 follow-zhifu</option>
+          </select>
+        </label>
+      </details>
+    </section>
+
+    <section class="panel">
+      <h2>问事 <span class="en">Event Question</span></h2>
+      <label>事件时间 Event date &amp; time
+        <input type="date" id="event-date">
+        <input type="time" id="event-time">
+      </label>
+      <label>问题类型 Question type
+        <select id="question"></select>
+      </label>
+      <label>占断主题 Divination topic
+        <input type="text" id="topic" placeholder="如: 婚姻 / 官司 / 求财">
+      </label>
+    </section>
+
+    <section class="panel">
+      <h2>意象保护 <span class="en">Yixiang Protection</span></h2>
+      <label>概念（逗号分隔）Concepts
+        <input type="text" id="yixiang" placeholder="财富,权威,突破 …">
+      </label>
+      <p class="hint">用于化气阵 / 寻时借运 / 遥测。Options: 财富 暴力 权威 突破 表现 情欲, or stems like 戊.</p>
+    </section>
+
+    <div id="status" class="status"></div>
+  </aside>
+
+  <section id="content">
+    <nav id="tabs">
+      <button data-tab="bazi" class="active">八字 BaZi</button>
+      <button data-tab="plate">奇门盘 Plate</button>
+      <button data-tab="caiguan">财官 Wealth·Career</button>
+      <button data-tab="hunlian">婚恋 Romance</button>
+      <button data-tab="xingge">性格 Personality</button>
+      <button data-tab="event">问事 Event</button>
+      <button data-tab="zhanduan">占断 Divination</button>
+      <button data-tab="yaoce">遥测 Yaoce</button>
+      <button data-tab="xunshijieyun">寻时 Timing</button>
+      <button data-tab="huaqizhen">化气阵 Array</button>
+      <button data-tab="yishenhuanjiang">移神换将 Remedy</button>
+    </nav>
+    <div id="tab-body">
+      <div class="placeholder">
+        <p>填写出生信息后选择一个分析页签。<br>Fill in birth details, then pick an analysis tab.</p>
+        <p class="hint">八字与奇门共用同一套历法换算（置闰法 · 时家转盘奇门），长期命理与短期时空互为参照。</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="palace-modal" class="modal hidden">
+  <div class="modal-box">
+    <button class="modal-close" aria-label="close">×</button>
+    <h3 id="modal-title"></h3>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<footer>
+  <p>Engine: <a href="https://github.com/skyfiredao/qmenpowers" target="_blank" rel="noopener">qmenpowers</a> (GPL-3.0, pure Bash, 置闰法 · 时家转盘奇门) · BaZi derived locally, optional <a href="https://astrology-api.io" target="_blank" rel="noopener">Astrology-API.io</a> precision mode</p>
+  <p class="hint">仅供文化研究与娱乐参考 · For cultural study and entertainment only — not professional advice.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
