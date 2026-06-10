@@ -3,24 +3,25 @@
 /*
  * Vector store for RAG retrieval. Backend chosen by VECTOR_STORE:
  *   local    : JSON file on disk + in-process cosine search (default).
- *              Zero infra; fine up to ~tens of thousands of chunks.
- *   insforge : InsForge-hosted pgvector table over REST (see NOTE below).
+ *   insforge : the vector index is persisted as a single JSON blob in an
+ *              InsForge storage bucket; the server downloads it on first use
+ *              and runs cosine search in-process. Survives the ephemeral
+ *              deploy container, and uses only documented InsForge endpoints
+ *              (InsForge has no managed vector-search API).
+ *
+ * Both backends share the same in-memory cosine search; they differ only in
+ * where the index is loaded from / saved to.
  *
  * Common interface:
  *   await upsert(items)            items: [{ id, vector, text, meta }]
  *   await search(queryVector, k)   -> [{ id, score, text, meta }]
  *   await count()
  *
- * --- NOTE on the InsForge backend ----------------------------------------
- * The InsForge calls below are written against the common PostgREST + pgvector
- * pattern but are NOT yet verified against InsForge's actual API. To finalise,
- * I need three things from your InsForge project:
- *   1. Base URL + auth header (e.g. apikey / Authorization: Bearer <key>)
- *   2. How a vector similarity search is exposed (an RPC like `match_chunks`,
- *      or a REST query with an order-by-distance operator)
- *   3. The table/columns (this code assumes a table `qms_chunks` with columns
- *      id text, embedding vector, content text, meta jsonb)
- * Until then, VECTOR_STORE defaults to `local` so everything runs.
+ * InsForge config (VECTOR_STORE=insforge):
+ *   INSFORGE_BASE_URL   e.g. https://<project>.insforge.app   (no trailing /)
+ *   INSFORGE_API_KEY    project API key (sent as x-api-key)
+ *   INSFORGE_BUCKET     storage bucket name you created
+ *   INSFORGE_OBJECT     blob key (default qms_vectors.json)
  */
 
 const fs = require('fs');
@@ -38,76 +39,80 @@ function cosine(a, b) {
   return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
 }
 
-/* ---- local JSON-file backend ------------------------------------------- */
+/* ---- persistence adapters ----------------------------------------------- */
+/* Each adapter implements load() -> items[] and save(items) -> void/Promise. */
 
-const local = {
-  _items: null,
-  _load() {
-    if (this._items) return this._items;
-    try { this._items = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); }
-    catch { this._items = []; }
-    return this._items;
+const localAdapter = {
+  load() {
+    try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); }
+    catch { return []; }
   },
-  _save() {
+  save(items) {
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-    fs.writeFileSync(DATA_FILE, JSON.stringify(this._items));
+    fs.writeFileSync(DATA_FILE, JSON.stringify(items));
   },
-  async upsert(items) {
-    const all = this._load();
-    const byId = new Map(all.map((x) => [x.id, x]));
-    for (const it of items) byId.set(it.id, it);
-    this._items = [...byId.values()];
-    this._save();
-    return this._items.length;
-  },
-  async search(q, k = 6) {
-    const all = this._load();
-    return all
-      .map((x) => ({ id: x.id, score: cosine(q, x.vector), text: x.text, meta: x.meta }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, k);
-  },
-  async count() { return this._load().length; },
 };
 
-/* ---- InsForge pgvector backend (unverified — see NOTE) ------------------ */
-
-const insforge = {
+const insforgeAdapter = {
   _cfg() {
     const base = (process.env.INSFORGE_BASE_URL || '').replace(/\/+$/, '');
     const key = process.env.INSFORGE_API_KEY || '';
-    if (!base || !key) throw new Error('InsForge not configured: set INSFORGE_BASE_URL and INSFORGE_API_KEY');
-    return { base, key, table: process.env.INSFORGE_TABLE || 'qms_chunks' };
+    const bucket = process.env.INSFORGE_BUCKET || '';
+    if (!base || !key || !bucket) {
+      throw new Error('InsForge store not configured: set INSFORGE_BASE_URL, INSFORGE_API_KEY, INSFORGE_BUCKET');
+    }
+    const object = process.env.INSFORGE_OBJECT || 'qms_vectors.json';
+    return { base, key, bucket, object };
   },
-  _headers(cfg) {
-    return { 'Content-Type': 'application/json', apikey: cfg.key, Authorization: `Bearer ${cfg.key}` };
+  _objectUrl(cfg) {
+    return `${cfg.base}/api/storage/buckets/${encodeURIComponent(cfg.bucket)}/objects/${encodeURIComponent(cfg.object)}`;
   },
-  async upsert(items) {
+  async load() {
     const cfg = this._cfg();
-    const rows = items.map((it) => ({ id: it.id, embedding: it.vector, content: it.text, meta: it.meta }));
-    const res = await fetch(`${cfg.base}/rest/v1/${cfg.table}`, {
-      method: 'POST',
-      headers: { ...this._headers(cfg), Prefer: 'resolution=merge-duplicates' },
-      body: JSON.stringify(rows),
-    });
-    if (!res.ok) throw new Error(`InsForge upsert failed: ${(await res.text().catch(() => res.status)).slice(0, 200)}`);
-    return rows.length;
+    const res = await fetch(this._objectUrl(cfg), { headers: { 'x-api-key': cfg.key } });
+    if (res.status === 404) return [];                       // index not uploaded yet
+    if (!res.ok) throw new Error(`InsForge download failed: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 160)}`);
+    const text = await res.text();
+    try { return JSON.parse(text); } catch { return []; }
   },
-  async search(q, k = 6) {
+  async save(items) {
     const cfg = this._cfg();
-    // Assumes a Postgres function exposed as an RPC; exact name TBD.
-    const res = await fetch(`${cfg.base}/rest/v1/rpc/match_${cfg.table}`, {
-      method: 'POST',
-      headers: this._headers(cfg),
-      body: JSON.stringify({ query_embedding: q, match_count: k }),
-    });
-    if (!res.ok) throw new Error(`InsForge search failed: ${(await res.text().catch(() => res.status)).slice(0, 200)}`);
-    const rows = await res.json();
-    return rows.map((r) => ({ id: r.id, score: r.similarity ?? r.score, text: r.content, meta: r.meta }));
+    // PUT the whole index as a JSON file (multipart/form-data, `file` field).
+    const fd = new FormData();
+    fd.append('file', new Blob([JSON.stringify(items)], { type: 'application/json' }), cfg.object);
+    const res = await fetch(this._objectUrl(cfg), { method: 'PUT', headers: { 'x-api-key': cfg.key }, body: fd });
+    if (!res.ok) throw new Error(`InsForge upload failed: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 160)}`);
   },
-  async count() { return -1; }, // unknown without a query
 };
 
-const store = BACKEND === 'insforge' ? insforge : local;
+const adapter = BACKEND === 'insforge' ? insforgeAdapter : localAdapter;
 
-module.exports = { upsert: (i) => store.upsert(i), search: (q, k) => store.search(q, k), count: () => store.count(), BACKEND, cosine };
+/* ---- store (shared in-memory index over the chosen adapter) -------------- */
+
+let cache = null; // loaded lazily; persists for the process lifetime
+
+async function ensureLoaded() {
+  if (!cache) cache = await adapter.load();
+  return cache;
+}
+
+async function upsert(items) {
+  const all = await ensureLoaded();
+  const byId = new Map(all.map((x) => [x.id, x]));
+  for (const it of items) byId.set(it.id, it);
+  cache = [...byId.values()];
+  await adapter.save(cache);
+  return cache.length;
+}
+
+async function search(q, k = 6) {
+  const all = await ensureLoaded();
+  return all
+    .map((x) => ({ id: x.id, score: cosine(q, x.vector), text: x.text, meta: x.meta }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, k);
+}
+
+async function count() { return (await ensureLoaded()).length; }
+
+module.exports = { upsert, search, count, BACKEND, cosine };

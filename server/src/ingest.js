@@ -25,14 +25,15 @@ async function main() {
   if (!items.length) { console.log('Nothing to ingest.'); return; }
 
   const batch = 96;
-  let done = 0;
+  const records = [];
   for (let i = 0; i < items.length; i += batch) {
     const slice = items.slice(i, i + batch);
     const vectors = await embeddings.embed(slice.map((s) => s.text));
-    await store.upsert(slice.map((s, j) => ({ id: s.id, vector: vectors[j], text: s.text, meta: s.meta })));
-    done += slice.length;
-    console.log(`  embedded ${done}/${items.length}`);
+    slice.forEach((s, j) => records.push({ id: s.id, vector: vectors[j], text: s.text, meta: s.meta }));
+    console.log(`  embedded ${records.length}/${items.length}`);
   }
+  // Single upsert -> one write/upload for the whole index.
+  await store.upsert(records);
   console.log(`Done. Vector store "${store.BACKEND}" now holds ${await store.count()} chunks.`);
 }
 
