@@ -3,46 +3,52 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="google" content="notranslate">
 <title>奇门超能 · Qi Men Superpowers — BaZi &amp; Qi Men Dun Jia</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%237c1d2b'/%3E%3Ctext x='16' y='22' font-size='19' text-anchor='middle' font-family='serif' fill='%23f4efe4'%3E%E5%A5%87%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body data-lang="en">
 <header>
+  <div id="lang-switch" role="group" aria-label="Language">
+    <button data-setlang="zh">中文</button>
+    <button data-setlang="en">EN</button>
+    <button data-setlang="both">中+EN</button>
+  </div>
   <h1 translate="no">奇门超能 <span class="sub">Qi Men Superpowers</span></h1>
-  <p class="tagline">八字命理 × 奇门遁甲 — BaZi destiny analysis meets Qi Men time-space strategy</p>
+  <p class="tagline"><span class="zh">八字命理 × 奇门遁甲 — 长期命盘与时空策略互参</span><span class="en">BaZi destiny analysis meets Qi Men time-space strategy</span></p>
 </header>
 
 <main>
   <aside id="controls">
     <section class="panel">
-      <h2>出生信息 <span class="en">Birth Details</span></h2>
-      <label>出生日期 Birth date
+      <h2><span class="zh">出生信息</span><span class="en">Birth Details</span></h2>
+      <label><span class="zh">出生日期</span><span class="en">Birth date</span>
         <input type="date" id="birth-date" value="1990-05-15">
       </label>
-      <label>出生时间 Birth time
+      <label><span class="zh">出生时间</span><span class="en">Birth time</span>
         <input type="time" id="birth-time" value="14:30">
       </label>
-      <label>性别 Gender
+      <label><span class="zh">性别</span><span class="en">Gender</span>
         <select id="gender">
           <option value="male">男 Male</option>
           <option value="female">女 Female</option>
         </select>
       </label>
       <details>
-        <summary>真太阳时校正 True solar time</summary>
-        <label>经度 Longitude (east +)
+        <summary><span class="zh">真太阳时校正</span><span class="en">True solar time</span></summary>
+        <label><span class="zh">经度（东经为正）</span><span class="en">Longitude (east +)</span>
           <input type="number" id="longitude" step="0.01" min="-180" max="180" placeholder="e.g. 116.4 (Beijing)">
         </label>
-        <label>时区 Clock UTC offset
+        <label><span class="zh">时区（UTC 偏移）</span><span class="en">Clock UTC offset</span>
           <input type="number" id="tz-offset" step="0.5" min="-12" max="14" value="8">
         </label>
       </details>
       <details>
-        <summary>天禽寄宫 Tianqin mode</summary>
+        <summary><span class="zh">天禽寄宫</span><span class="en">Tianqin mode</span></summary>
         <label>
           <select id="tianqin">
-            <option value="follow-tiannei">随天芮 follow-tiannei（默认）</option>
+            <option value="follow-tiannei">随天芮 follow-tiannei</option>
             <option value="jikun">寄坤二宫 jikun</option>
             <option value="follow-zhifu">随值符 follow-zhifu</option>
           </select>
@@ -51,53 +57,36 @@
     </section>
 
     <section class="panel">
-      <h2>问事 <span class="en">Event Question</span></h2>
-      <label>事件时间 Event date &amp; time
+      <h2><span class="zh">问事</span><span class="en">Event Question</span></h2>
+      <label><span class="zh">事件时间</span><span class="en">Event date &amp; time</span>
         <input type="date" id="event-date">
         <input type="time" id="event-time">
       </label>
-      <label>问题类型 Question type
+      <label><span class="zh">问题类型</span><span class="en">Question type</span>
         <select id="question"></select>
       </label>
-      <label>占断主题 Divination topic
-        <input type="text" id="topic" placeholder="如: 婚姻 / 官司 / 求财">
+      <label><span class="zh">占断主题</span><span class="en">Divination topic</span>
+        <input type="text" id="topic" placeholder="婚姻 / 官司 / 求财">
       </label>
     </section>
 
     <section class="panel">
-      <h2>意象保护 <span class="en">Yixiang Protection</span></h2>
-      <label>概念（逗号分隔）Concepts
+      <h2><span class="zh">意象保护</span><span class="en">Yixiang Protection</span></h2>
+      <label><span class="zh">概念（逗号分隔）</span><span class="en">Concepts (comma-separated)</span>
         <input type="text" id="yixiang" placeholder="财富,权威,突破 …">
       </label>
-      <p class="hint">用于化气阵 / 寻时借运 / 遥测。Options: 财富 暴力 权威 突破 表现 情欲, or stems like 戊.</p>
+      <p class="hint"><span class="zh">用于化气阵 / 寻时借运 / 遥测。可选：财富 暴力 权威 突破 表现 情欲，或天干如 戊。</span><span class="en">Used by Array / Timing / Sensing. Options: 财富 wealth, 权威 authority, 突破 breakthrough…, or stems like 戊.</span></p>
     </section>
 
     <div id="status" class="status"></div>
   </aside>
 
   <section id="content">
-    <nav id="tabs">
-      <button data-tab="bazi" class="active">八字 BaZi</button>
-      <button data-tab="plate">奇门盘 Plate</button>
-      <button data-tab="caiguan">财官 Wealth·Career</button>
-      <button data-tab="hunlian">婚恋 Romance</button>
-      <button data-tab="xingge">性格 Personality</button>
-      <button data-tab="event">问事 Event</button>
-      <button data-tab="zhanduan">占断 Divination</button>
-      <button data-tab="yaoce">遥测 Yaoce</button>
-      <button data-tab="xunshijieyun">寻时 Timing</button>
-      <button data-tab="huaqizhen">化气阵 Array</button>
-      <button data-tab="yishenhuanjiang">移神换将 Remedy</button>
-    </nav>
+    <nav id="tabs"></nav>
     <div id="toolbar">
-      <button id="print-btn" type="button" onclick="window.print()" title="打印当前页面 / 另存为 PDF">🖨 打印 Print / Save PDF</button>
+      <button id="print-btn" type="button" onclick="window.print()" title="Print / Save as PDF"><span class="zh">🖨 打印 / 存为 PDF</span><span class="en">🖨 Print / Save PDF</span></button>
     </div>
-    <div id="tab-body">
-      <div class="placeholder">
-        <p>填写出生信息后选择一个分析页签。<br>Fill in birth details, then pick an analysis tab.</p>
-        <p class="hint">八字与奇门共用同一套历法换算（置闰法 · 时家转盘奇门），长期命理与短期时空互为参照。</p>
-      </div>
-    </div>
+    <div id="tab-body"></div>
   </section>
 </main>
 
@@ -110,8 +99,8 @@
 </div>
 
 <footer>
-  <p>Engine: <a href="https://github.com/skyfiredao/qmenpowers" target="_blank" rel="noopener">qmenpowers</a> (GPL-3.0, pure Bash, 置闰法 · 时家转盘奇门) · BaZi derived locally, optional <a href="https://astrology-api.io" target="_blank" rel="noopener">Astrology-API.io</a> precision mode</p>
-  <p class="hint">仅供文化研究与娱乐参考 · For cultural study and entertainment only — not professional advice.</p>
+  <p><span class="zh">引擎：</span><span class="en">Engine: </span><a href="https://github.com/skyfiredao/qmenpowers" target="_blank" rel="noopener">qmenpowers</a> <span class="zh">（GPL-3.0，纯 Bash，置闰法 · 时家转盘奇门）· 八字本地推算</span><span class="en">(GPL-3.0, pure Bash, Zhi-Run hourly rotating plate) · BaZi derived locally</span></p>
+  <p class="hint"><span class="zh">仅供文化研究与娱乐参考，不构成专业建议。</span><span class="en">For cultural study and entertainment only — not professional advice.</span></p>
 </footer>
 
 <script src="config.js"></script>
