@@ -950,6 +950,8 @@ function chatContext() {
   ctx.gender = $('#gender')?.value;
   const ev = getEventTime();
   if (ev) ctx.eventTime = ev;
+  const lng = $('#longitude')?.value;
+  if (lng) { ctx.longitude = Number(lng); ctx.tzOffset = Number($('#tz-offset').value || 8); }
   if (lastReadingContext) { ctx.tab = lastReadingContext.tab; ctx.chartText = lastReadingContext.text; }
   return ctx;
 }

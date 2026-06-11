@@ -255,6 +255,17 @@ async function handleChat(req, res) {
     const messages = Array.isArray(body.messages) ? body.messages : [];
     const context = body.context || {};
 
+    // Apply true solar time to birth/event datetimes when a longitude is given,
+    // matching the analysis tabs so the chat and tabs agree.
+    if (context.longitude != null) {
+      try {
+        applySolarCorrection(context, 'birth');
+        if (context.eventTime) applySolarCorrection(context, 'eventTime');
+      } catch (e) {
+        console.error(`[${new Date().toISOString()}] /api/chat solar:`, e.message);
+      }
+    }
+
     // Auto-compute the BaZi chart from birth details so the model can interpret
     // directly instead of asking the user to compute it elsewhere.
     if (context.birth) {
