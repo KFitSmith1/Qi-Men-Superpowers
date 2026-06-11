@@ -66,9 +66,46 @@ fly launch --no-deploy        # detects the Dockerfile; creates fly.toml
 fly deploy
 ```
 
+## Coolify (recommended for a VPS)
+
+[Coolify](https://coolify.io) running on your VPS handles the build, reverse
+proxy, TLS, and env vars — so you skip the manual Docker + Caddy steps below.
+The repo already exposes everything Coolify needs (Dockerfile, `EXPOSE 8787`,
+`/api/health`, `0.0.0.0` binding).
+
+1. **+ New → Application → Public/Private Repository**, select this repo and the
+   `claude/compassionate-babbage-cvxmm8` branch (or `main`).
+2. **Build Pack: `Dockerfile`** (Coolify auto-detects the root `Dockerfile`).
+3. **Port:** set **Ports Exposes** = `8787`. Health check path: `/api/health`.
+4. **Domains:** enter your FQDN (e.g. `https://qms.yourdomain.com`); Coolify
+   provisions the Let's Encrypt cert automatically. Point that domain's DNS at
+   the VPS first.
+5. **Environment Variables** (Settings → Environment Variables) — add the chat /
+   RAG block, marking the keys as secrets:
+   ```
+   LLM_PROVIDER=openai
+   OPENAI_API_KEY=<rotated OpenAI key>
+   OPENAI_MODEL=gpt-4o-mini
+   EMBEDDINGS_PROVIDER=openai
+   VECTOR_STORE=insforge
+   INSFORGE_BASE_URL=https://<project>.us-east.insforge.app
+   INSFORGE_API_KEY=<rotated InsForge key>
+   INSFORGE_BUCKET=qms-knowledge
+   ```
+   These are **runtime** variables (no "Build Variable" toggle needed).
+6. **Deploy.** Watch the deploy logs for
+   `Knowledge base: N chunks loaded from insforge`.
+7. **Load the knowledge base** by running ingest on your own machine (see the
+   VPS section's step 6 — it uploads the index to InsForge), then hit
+   **Redeploy/Restart** in Coolify so the server reloads it.
+
+Updating later: push to the branch and Coolify redeploys (enable auto-deploy on
+push, or click Deploy).
+
 ## Hostinger KVM VPS (Docker + HTTPS)
 
-A Hostinger **VPS** (root SSH, Docker, bash) runs the whole app — API, frontend,
+If you are **not** using Coolify, this is the manual path. A Hostinger **VPS**
+(root SSH, Docker, bash) runs the whole app — API, frontend,
 and the OpenAI/InsForge calls. (Hostinger's *shared*/PHP plans cannot: they
 can't keep a Node process alive or spawn `bash`.)
 
