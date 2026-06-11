@@ -35,8 +35,15 @@ function hashEmbed(text) {
 /* ---- OpenAI embeddings ------------------------------------------------- */
 
 async function openaiEmbed(texts) {
-  const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
-  const key = process.env.OPENAI_API_KEY;
+  // OpenRouter has NO embeddings endpoint, so embeddings get their own config:
+  // EMBEDDINGS_API_KEY / EMBEDDINGS_BASE_URL (fall back to the OPENAI_* values,
+  // except that an OpenRouter base URL is replaced with api.openai.com).
+  let base = process.env.EMBEDDINGS_BASE_URL
+    || (String(process.env.OPENAI_BASE_URL || '').includes('openrouter')
+      ? 'https://api.openai.com/v1'
+      : process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1');
+  base = base.replace(/\/+$/, '');
+  const key = process.env.EMBEDDINGS_API_KEY || process.env.OPENAI_API_KEY;
   const model = process.env.EMBEDDINGS_MODEL || 'text-embedding-3-small';
   if (!key) return texts.map(hashEmbed);
   const out = [];
