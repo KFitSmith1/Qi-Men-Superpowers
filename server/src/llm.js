@@ -42,7 +42,10 @@ function personaSystem(lang, context) {
     'them to another tab, and do NOT say you are unable to compute charts.',
     'Do NOT invent or guess numerical values that are not given; reason from what is provided.',
     'Only if NO chart data is provided and the question needs it, ask the user to enter their',
-    'birth date and time in the left panel. Be concrete and practical; avoid fatalism.',
+    'birth date and time in the left panel.',
+    'When tools are available and the question is about wealth/career, romance, personality,',
+    'remedies, or array placement, CALL the matching reading tool first to get the detailed Qi',
+    'Men analysis, then explain its results in plain language. Be concrete and practical; avoid fatalism.',
     'Add a brief reminder that this is for cultural study and entertainment, not professional advice,',
     'only when giving health, legal, or financial-sounding guidance.',
     langRule,
@@ -86,45 +89,84 @@ async function stubStream({ messages, lang, onToken }) {
   return text;
 }
 
-/* ---- Provider: OpenAI-compatible chat completions ------------------------ */
+/* ---- Provider: OpenAI-compatible chat completions (with tool calling) ---- */
 
-async function openaiStream({ messages, context, lang, onToken, signal }) {
+function safeParse(s) { try { return JSON.parse(s || '{}'); } catch { return {}; } }
+
+async function openaiStream({ messages, context, lang, onToken, onEvent, tools, executeTool, signal }) {
   const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
   const key = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
   if (!key) return stubStream({ messages, lang, onToken });
 
-  const res = await fetch(`${base}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify({ model, stream: true, max_tokens: 1024, messages: buildMessages({ messages, context, lang }) }),
-    signal,
-  });
-  if (!res.ok || !res.body) {
-    const errText = await res.text().catch(() => `HTTP ${res.status}`);
-    throw new Error(`LLM provider error: ${errText.slice(0, 300)}`);
-  }
-
-  // Parse the SSE stream of an OpenAI-compatible endpoint.
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = '';
+  const convo = buildMessages({ messages, context, lang });
+  const useTools = Array.isArray(tools) && tools.length > 0;
   let full = '';
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let nl;
-    while ((nl = buf.indexOf('\n')) >= 0) {
-      const line = buf.slice(0, nl).trim();
-      buf = buf.slice(nl + 1);
-      if (!line.startsWith('data:')) continue;
-      const data = line.slice(5).trim();
-      if (data === '[DONE]') return full;
-      try {
-        const delta = JSON.parse(data)?.choices?.[0]?.delta?.content;
-        if (delta) { full += delta; onToken(delta); }
-      } catch { /* ignore keep-alive / partial */ }
+
+  // Multi-turn loop: the model may call tools (engine readings) before answering.
+  for (let iter = 0; iter < 5; iter++) {
+    const body = { model, stream: true, max_tokens: 1024, messages: convo };
+    if (useTools) { body.tools = tools.map((t) => t.schema); body.tool_choice = 'auto'; }
+
+    const res = await fetch(`${base}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!res.ok || !res.body) {
+      const errText = await res.text().catch(() => `HTTP ${res.status}`);
+      throw new Error(`LLM provider error: ${errText.slice(0, 300)}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let content = '';
+    const toolCalls = {}; // index -> { id, name, args }
+
+    let streamDone = false;
+    while (!streamDone) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice(5).trim();
+        if (data === '[DONE]') { streamDone = true; break; }
+        let choice;
+        try { choice = JSON.parse(data)?.choices?.[0]; } catch { continue; }
+        if (!choice) continue;
+        const delta = choice.delta || {};
+        if (delta.content) { content += delta.content; full += delta.content; onToken(delta.content); }
+        for (const tc of delta.tool_calls || []) {
+          const idx = tc.index ?? 0;
+          const cur = toolCalls[idx] || (toolCalls[idx] = { id: '', name: '', args: '' });
+          if (tc.id) cur.id = tc.id;
+          if (tc.function?.name) cur.name += tc.function.name;
+          if (tc.function?.arguments) cur.args += tc.function.arguments;
+        }
+      }
+    }
+
+    const calls = Object.values(toolCalls).filter((c) => c.name);
+    if (!calls.length) break; // model produced its final answer (already streamed)
+
+    // Execute the requested tools and feed results back for the next turn.
+    convo.push({
+      role: 'assistant',
+      content: content || null,
+      tool_calls: calls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: c.args || '{}' } })),
+    });
+    for (const c of calls) {
+      if (onEvent) onEvent({ type: 'tool', name: c.name });
+      let result;
+      try { result = await executeTool(c.name, safeParse(c.args)); }
+      catch (e) { result = `Tool error: ${e.message}`; }
+      convo.push({ role: 'tool', tool_call_id: c.id, content: String(result).slice(0, 8000) });
     }
   }
   return full;
@@ -132,11 +174,11 @@ async function openaiStream({ messages, context, lang, onToken, signal }) {
 
 /* ---- Dispatch ----------------------------------------------------------- */
 
-async function streamChat({ messages, context, lang, onToken, signal }) {
+async function streamChat({ messages, context, lang, onToken, onEvent, tools, executeTool, signal }) {
   switch (PROVIDER) {
     case 'openai':
     case 'insforge': // InsForge gateway is assumed OpenAI-compatible until confirmed
-      return openaiStream({ messages, context, lang, onToken, signal });
+      return openaiStream({ messages, context, lang, onToken, onEvent, tools, executeTool, signal });
     case 'stub':
     default:
       return stubStream({ messages, lang, onToken });

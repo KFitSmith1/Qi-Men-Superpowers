@@ -924,6 +924,15 @@ function activateTab(tab) {
 
 const chatState = { messages: [], streaming: false, speak: false };
 
+/* Friendly labels for the engine reading tools the model can call. */
+const TOOL_LABELS = {
+  wealth_career_reading: ['财官', 'Wealth·Career'],
+  romance_reading: ['婚恋', 'Romance'],
+  personality_reading: ['性格', 'Personality'],
+  remedy_reading: ['移神换将', 'Remedy'],
+  array_placement: ['化气阵', 'Array'],
+};
+
 /* The latest computed reading text, captured so chat can ground answers in it. */
 let lastReadingContext = null;
 function captureReadingContext(tab, text) {
@@ -953,7 +962,12 @@ function renderChatLog() {
     return;
   }
   log.innerHTML = chatState.messages.map((m) => {
-    let body = esc(m.content).replace(/\n/g, '<br>');
+    let body = '';
+    if (m.tools && m.tools.length) {
+      const tags = m.tools.map((t) => `<span class="src-tag">${esc(TOOL_LABELS[t] ? bi(TOOL_LABELS[t][0], TOOL_LABELS[t][1]) : t)}</span>`).join('');
+      body += `<div class="chat-tools">${bi('调用', 'Consulted')}: ${tags}</div>`;
+    }
+    body += esc(m.content).replace(/\n/g, '<br>');
     if (m.sources && m.sources.length) {
       const tags = m.sources.map((s) => `<span class="src-tag">${esc(s.title)}</span>`).join('');
       body += `<div class="chat-sources">${bi('参考', 'Sources')}: ${tags}</div>`;
@@ -1020,6 +1034,7 @@ async function sendChat(text) {
         let ev; try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
         if (ev.type === 'token') { chatState.messages[idx].content += ev.text; renderChatLog(); }
         else if (ev.type === 'sources') { chatState.messages[idx].sources = ev.items; renderChatLog(); }
+        else if (ev.type === 'tool') { (chatState.messages[idx].tools ||= []).push(ev.name); renderChatLog(); }
         else if (ev.type === 'error') { chatState.messages[idx].content += `\n[${ev.message}]`; renderChatLog(); }
       }
     }

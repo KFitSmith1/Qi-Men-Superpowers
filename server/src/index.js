@@ -182,6 +182,38 @@ function serveStatic(req, res) {
   });
 }
 
+/** Qi Men reading modules exposed to the chat model as callable tools. */
+const READING_TOOLS = {
+  wealth_career_reading: { module: 'caiguan', desc: 'Qi Men wealth & career reading (财官): seven wealth hazards, six-harm detection, monthly-decree relations, and industry symbols.' },
+  romance_reading: { module: 'hunlian', desc: 'Qi Men romance & relationship reading (婚恋): partner combinations, peach-blossom, lonely-star patterns.' },
+  personality_reading: { module: 'xingge', desc: 'Qi Men personality reading (性格) from the day & hour stem palaces.' },
+  remedy_reading: { module: 'yishenhuanjiang', desc: 'Transformation remedy (移神换将): removal, combination, drainage, and clash fixes for harmful patterns.' },
+  array_placement: { module: 'huaqizhen', desc: 'Array placement plan (化气阵): per-palace placements to suppress harmful energies.' },
+};
+
+/** Tool schemas for the model (only offered when birth details are available). */
+function buildReadingTools(context) {
+  if (!context.birth) return null;
+  return Object.entries(READING_TOOLS).map(([name, info]) => ({
+    schema: {
+      type: 'function',
+      function: {
+        name,
+        description: `${info.desc} Uses the birth details already provided; call with no arguments.`,
+        parameters: { type: 'object', properties: {} },
+      },
+    },
+  }));
+}
+
+async function executeReadingTool(name, _args, context) {
+  const info = READING_TOOLS[name];
+  if (!info) return `Unknown tool "${name}".`;
+  if (!context.birth) return 'No birth details available — ask the user to enter their birth date and time.';
+  const r = await qimen.runModule({ module: info.module, birth: context.birth });
+  return r.text || '(no output)';
+}
+
 /** Streaming chat over SSE. Body: { messages:[{role,content}], context?, lang? } */
 async function handleChat(req, res) {
   let body;
@@ -236,7 +268,10 @@ async function handleChat(req, res) {
       context,
       lang: body.lang || 'en',
       signal: ac.signal,
+      tools: buildReadingTools(context),
+      executeTool: (name, args) => executeReadingTool(name, args, context),
       onToken: (t) => send({ type: 'token', text: t }),
+      onEvent: (ev) => send(ev), // e.g. { type: 'tool', name }
     });
     send({ type: 'done' });
   } catch (err) {

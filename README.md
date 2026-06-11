@@ -121,6 +121,12 @@ matching chunks, injects them as grounding context, and streams a `sources`
 event listing the notes used. The system prompt forbids inventing chart
 calculations, so answers stay anchored to the computed reading and the corpus.
 
+When birth details are present, the backend also computes the BaZi chart (four
+pillars, strength, luck pillars, current-year pillar) and injects it every turn,
+and the model can **call the Qi Men reading modules as tools** — 财官 wealth /
+婚恋 romance / 性格 personality / 移神换将 remedy / 化气阵 array — to pull a full
+analysis mid-conversation (consulted modules appear as tags in the reply).
+
 ### Building the knowledge base from an Obsidian vault
 
 ```bash
