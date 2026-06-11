@@ -186,6 +186,12 @@ const KEY_EN = {
   '丁(男)': 'Ding (male)', '癸(女)': 'Gui (female)', '三奇含义': 'Three Wonders — Meaning',
   '有击刑和门迫': 'With Punishment & Forced-Gate', '保护干合(配偶),六合(人缘)': 'Protect the combination (spouse) & Harmony (popularity)',
   '用化气阵化解': 'Resolve with the Qi Array',
+  // labels across the other modules
+  '财富总六害': 'Wealth total Six-Harms', '事业总六害': 'Career total Six-Harms', '建议': 'Advice',
+  '宫内符号': 'Palace symbols', '匹配行业': 'Matching industries',
+  '局': 'Plate', '驿马': 'Sky Horse', '重点格局': 'Key Patterns', '逐宫分析': 'Palace-by-Palace',
+  '合出': 'Combine out', '推荐': 'Recommended', '泄化（金生水泄金气）': 'Drain (Metal feeds Water, draining Metal qi)',
+  '选项': 'Options', '可用占断主题 (51 个)': 'Available divination topics (51)',
 };
 const keyGloss = (label) => {
   if (KEY_EN[label]) return KEY_EN[label];
@@ -299,6 +305,62 @@ const EN_FIXED = {
   '在空亡所在宫位放空亡对应的形象': 'In the palace where the Void sits, place imagery matching that Void.',
   '非常伤害感情。遇庚+白虎更甚: 受情伤，情感关系复杂，多段不寻常的感情，自己或家庭父母，变故极多，伤害极大': 'Very damaging to relationships. With Geng + White Tiger it is worse: heartbreak, tangled relationships, several unusual affairs, upheaval affecting you or your parents, and great harm.',
   '用化气阵化解': 'Resolve with the Qi Array.',
+  // wealth & career (财官)
+  '月令生，扩张，量大。生助': 'Month feeds you — expansion, large scale. (Supports.)',
+  '月令同，稳健，量大。生助': 'Same as the month — steady, large scale. (Supports.)',
+  '财富和事业二者不可兼得，需要踩一捧一，反之必出事': 'Wealth and career cannot both be maximised — favour one and suppress the other, or trouble follows.',
+  '财富六害较少，建议捧财富、踩事业': 'Wealth has fewer Six-Harms — favour wealth and suppress career.',
+  '日干/年干所克天干，可控制和利用的资源上限': 'The stems controlled by the Day/Year stem — the ceiling of resources you can control and use.',
+  // personality (性格) trait lists
+  '高远，远，飞，变，动，高，扬，志，阔，渺茫，不切实际，宏大': 'Lofty, far-reaching, soaring, changeable, dynamic, high, uplifted, aspirational, broad, vague, impractical, grand.',
+  '试错，错误，问题，改革，要害，内敛的方式挑战旧权威，指出要害，态度激烈，咬定青山不放口，谋求创新，谋求对的未来，没事找事，直戳要害，直插心脏，招致反对者愤恨，检查监督，纠错改革': 'Trial-and-error, mistakes, problems, reform, vital points; challenges old authority in a reserved way, points out weak spots, intense in attitude, tenacious and unyielding, seeks innovation and a better future, stirs things up, strikes at the core, provokes opponents’ resentment, inspects and supervises, corrects and reforms.',
+  '密，暗，私，女，精，见不得光，心思细腻，多愁善感，爱沉思，精致，细致': 'Secret, hidden, private, feminine, refined; not for the light of day; delicate-minded, sentimental, contemplative, exquisite, meticulous.',
+  '阴谋，谋，护，善策划，冥助，暗中保护': 'Intrigue, strategy, protection; good at planning, unseen help, covert protection.',
+  // transformation remedy (移神换将)
+  '补辛象（缺什么补什么）': 'Supplement Xin imagery (supply what is lacking).',
+  '补庚象（缺什么补什么）': 'Supplement Geng imagery (supply what is lacking).',
+  '厚重陶石、黄色大地色物品': 'Heavy pottery & stone; yellow earth-toned objects.',
+  '引入乙木柔性能量，花草、柔性艺术品，刚柔并济': 'Introduce Yi-Wood’s soft energy — flowers & plants, soft artworks — balancing firmness with gentleness.',
+  '补火象泄木气': 'Supplement Fire imagery to drain Wood qi.',
+  '补木象泄水气': 'Supplement Wood imagery to drain Water qi.',
+  '补水象泄金气': 'Supplement Water imagery to drain Metal qi.',
+  '补丁象合住壬 （推导）壬丁暗合 注意同宫有入墓，合法可能加重束缚，优先用泄化': 'Supplement Ding imagery to bind Ren. (Derived: Ren and Ding secretly combine.) Note: the same palace has Tomb-entry; combining may worsen the binding — prefer draining.',
+  '文化精品、星形饰品、紫色精美物': 'Cultural fine goods, star-shaped ornaments, exquisite purple objects.',
+  '补酉象合住辰 注意同宫有入墓，合法可能加重束缚，优先用泄化': 'Supplement You imagery to bind Chen. Note: the same palace has Tomb-entry; combining may worsen the binding — prefer draining.',
+  '补戌象冲开辰墓': 'Supplement Xu imagery to clash open the Chen tomb.',
+  '补酉象合出辰墓': 'Supplement You imagery to combine the Chen tomb open.',
+  '补辰象冲开戌墓': 'Supplement Chen imagery to clash open the Xu tomb.',
+  '补卯象合出戌墓': 'Supplement Mao imagery to combine the Xu tomb open.',
+  '补未象冲开丑墓': 'Supplement Wei imagery to clash open the Chou tomb.',
+  '补子象合出丑墓': 'Supplement Zi imagery to combine the Chou tomb open.',
+  '避开东南方位活动': 'Avoid activity in the Southeast.',
+  '避开西北方位活动': 'Avoid activity in the Northwest.',
+  '避开东北方位活动': 'Avoid activity in the Northeast.',
+  '瓷器,缸瓮,灰盆,香纸,皮毛,量器,米尺,筛网,小屋,药物,硬物,坛子,盆,缸': 'Porcelain, jars & urns, ash basins, incense paper, fur, measuring vessels, rulers, sieves, huts, medicine, hard objects, crocks, basins, vats.',
+  '高处挂乙象 注意同宫有入墓，合法可能加重束缚，优先用泄化': 'Hang Yi imagery high. Note: the same palace has Tomb-entry; combining may worsen the binding — prefer draining.',
+  '柔软绿色植物': 'Soft green plants.',
+  '低处摆巳象合住申 注意同宫有入墓，合法可能加重束缚，优先用泄化': 'Place Si imagery low to bind Shen. Note: the same palace has Tomb-entry; combining may worsen the binding — prefer draining.',
+  '红色烛火': 'Red candle flame.',
+  '胭脂,簪环,笼子,瓶子,匣,机密文件': 'Rouge, hairpins & rings, cages, bottles, boxes, confidential documents.',
+  '高处挂乙象': 'Hang Yi imagery high.',
+  '低处摆巳象': 'Place Si imagery low.',
+  '声引: 响铃、乐器': 'Sound attractor: bells, musical instruments.',
+  '光引: 亮灯、焚香、反光镜': 'Light attractor: bright lamps, incense, mirrors.',
+  '气引: 通风、开窗': 'Air attractor: ventilation, open windows.',
+  '择时: 必须在真太阳时的对应时辰执行': 'Timing: must be carried out at the matching true-solar-time hour.',
+  // array placement (化气阵)
+  '大红 光源 台灯落地灯': 'Bright red; light sources; desk and floor lamps.',
+  '普通人不要选凶险的形象如龙虎蛇': 'Ordinary people should not choose fierce images such as dragon, tiger, or snake.',
+  // event (问事) patterns
+  '奇门遁甲分析': 'Qi Men Dun Jia Analysis',
+  '奇门遁甲占断': 'Qi Men Dun Jia Divination',
+  '乙加丙 奇仪相佐(吉) — 木火通明,利考试文章,才华展露,功名可就': 'Yi + Bing — Wonder & Tool Assist (auspicious): Wood-Fire brilliance; favours exams & writing; talent on display; honours within reach.',
+  '丙加己 月奇入地(平) — 辛劳有成,火入土中有暗光,先难后易': 'Bing + Ji — Moon-Wonder Enters Earth (neutral): toil rewarded; fire within earth has hidden light; hard first, then easy.',
+  '壬加癸 幼女奸淫(凶) — 淫乱暗昧,阴气极重,防色祸暗害': 'Ren + Gui — illicit lust (inauspicious): debauchery and obscurity; extreme yin energy; guard against sex scandals and hidden harm.',
+  '丁加辛 朱雀入狱(凶) — 文书损坏,信息走漏,机密泄露,罪证暴露': 'Ding + Xin — Vermilion Bird Imprisoned (inauspicious): documents damaged, information leaks, secrets exposed, evidence revealed.',
+  '己加壬 地网高张(凶) — 困阵四布,利设伏埋伏,不利出行远征,被困受制': 'Ji + Ren — Earth Net Spread High (inauspicious): traps all around; good for ambush, bad for travel or campaigns; trapped and constrained.',
+  '戊加乙 青龙合灵(吉) — 贵人扶持,利求财谋事,阴人帮助,门户增辉': 'Wu + Yi — Azure Dragon Joins Spirit (auspicious): benefactors support you; good for wealth and ventures; help from women; the household gains lustre.',
+  '癸加丁 螣蛇夭矫(凶) — 灭烛之象,文书尽毁,星奇被灭,信息全无': 'Gui + Ding — Serpent Writhing (inauspicious): image of a snuffed candle; documents destroyed; the star-wonder extinguished; information all lost.',
 };
 
 /* Token glossary for templated lines — longest match wins. */
@@ -390,6 +452,23 @@ const EN_VOCAB = {
   '和': 'and', '互相': 'mutually', '有意愿': 'willing', '有意中人': 'have a sweetheart',
   '交往': 'dating', '机会': 'opportunity', '没有': 'no', '但': 'but', '也': 'also', '的天干': ' stem',
   '化气阵': 'Qi Array', '用': 'use',
+  // wealth/career (财官) industries & terms
+  '事业': 'Career', '财富': 'Wealth', '总六害': 'total Six-Harms', '教培': 'education & training',
+  '芯片': 'semiconductors', '码农': 'coder', '程序员': 'programmer',
+  // transformation remedy (移神换将) composition
+  '补': 'supplement', '泄': 'drain', '气': 'qi', '合住': 'bind', '合出': 'combine out',
+  '冲开': 'clash open', '挂': 'hang', '摆': 'place', '活动': 'activity', '加': '+',
+  '缺什么补什么': '(supply what is lacking)', '同宫': 'same palace', '推导': 'derived',
+  '暗合': 'hidden combination', '束缚': 'binding', '加重': 'worsen', '优先': 'prefer', '注意': 'note',
+  '避让': 'avoidance', '合法': 'combining', '可能': 'may',
+  // divination (占断) topics
+  '投军': 'enlisting', '攻城': 'sieging a city', '胜败': 'victory or defeat', '文武升迁': 'civil/military promotion',
+  '降职调动': 'demotion or transfer', '求人办事': 'asking a favour', '访人': 'visiting someone', '人来访': 'a visitor comes',
+  '请客': 'hosting guests', '求人推荐': 'seeking a referral', '任职': 'taking a post', '退役': 'discharge',
+  '行人安否': 'a traveler’s safety', '行人归期': 'a traveler’s return', '开店': 'opening a shop', '买货': 'buying goods',
+  '借贷': 'borrowing', '放债': 'lending', '请医': 'calling a doctor', '产育': 'childbirth', '失物': 'lost items',
+  '走失': 'going missing', '逃亡': 'fleeing', '寻人': 'finding a person', '信息虚实': 'true-or-false information',
+  '囚禁': 'imprisonment', '家宅': 'household', '天气': 'weather', '农事': 'farming', '是': 'yes', '星墓': 'star tomb',
 };
 /* Wan Wu correspondence vocabulary — top terms across the engine's data
    tables (body, people, places, objects, animals, traits, events…). Used for
