@@ -42,6 +42,34 @@ function roundVec(v) {
   return o;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** fetch with retry on transient failures (network errors, 429, 5xx).
+ *  `optsFn` may be a function so the request body (FormData) is rebuilt per try. */
+async function fetchRetry(url, optsFn, tries = 4) {
+  let delay = 400;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fetch(url, typeof optsFn === 'function' ? optsFn() : optsFn);
+      if ((res.status === 429 || res.status >= 500) && i < tries - 1) { await sleep(delay); delay *= 2.5; continue; }
+      return res;
+    } catch (e) {
+      if (i < tries - 1) { await sleep(delay); delay *= 2.5; continue; }
+      throw e;
+    }
+  }
+}
+
+/** Run async fn over items with bounded concurrency; preserves result order. */
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let idx = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (idx < items.length) { const i = idx++; out[i] = await fn(items[i], i); }
+  }));
+  return out;
+}
+
 /* ---- cosine similarity -------------------------------------------------- */
 
 function cosine(a, b) {
@@ -93,20 +121,20 @@ const insforgeAdapter = {
     }
   },
   async _put(cfg, key, text) {
-    const body = () => {
+    const opts = () => {
       const fd = new FormData();
       fd.append('file', new Blob([text], { type: 'application/json' }), key.split('/').pop());
-      return fd;
+      return { method: 'PUT', headers: { 'x-api-key': cfg.key }, body: fd };
     };
-    let res = await fetch(this._url(cfg, key), { method: 'PUT', headers: { 'x-api-key': cfg.key }, body: body() });
+    let res = await fetchRetry(this._url(cfg, key), opts);
     if (res.status === 404) { // bucket missing — create and retry once
       await this._ensureBucket(cfg);
-      res = await fetch(this._url(cfg, key), { method: 'PUT', headers: { 'x-api-key': cfg.key }, body: body() });
+      res = await fetchRetry(this._url(cfg, key), opts);
     }
     if (!res.ok) throw new Error(`InsForge upload failed: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 160)}`);
   },
   async _getJson(cfg, key) {
-    const res = await fetch(this._url(cfg, key), { headers: { 'x-api-key': cfg.key } });
+    const res = await fetchRetry(this._url(cfg, key), { headers: { 'x-api-key': cfg.key } });
     if (!res.ok) return null;
     try { return JSON.parse(await res.text()); } catch { return null; }
   },
@@ -117,11 +145,10 @@ const insforgeAdapter = {
     const cfg = this._cfg();
     const idx = await this._getJson(cfg, this._indexKey(cfg));
     if (idx && Number.isInteger(idx.shards)) {
+      // Fetch shards in parallel (bounded), preserving chunk order across shards.
+      const parts = await mapLimit([...Array(idx.shards).keys()], 6, (i) => this._getJson(cfg, this._shardKey(cfg, i)));
       const out = [];
-      for (let i = 0; i < idx.shards; i++) {
-        const part = await this._getJson(cfg, this._shardKey(cfg, i));
-        if (Array.isArray(part)) out.push(...part);
-      }
+      for (const part of parts) if (Array.isArray(part)) out.push(...part);
       return out;
     }
     // Backward-compat: a single legacy blob from before sharding.
@@ -143,9 +170,9 @@ const insforgeAdapter = {
     }
     if (cur.length) shards.push(cur);
 
-    for (let i = 0; i < shards.length; i++) {
-      await this._put(cfg, this._shardKey(cfg, i), JSON.stringify(shards[i]));
-    }
+    // Upload all shards (parallel, with retries) BEFORE writing the manifest, so
+    // a reader never sees a manifest that points past the shards that exist.
+    await mapLimit(shards, 6, (s, i) => this._put(cfg, this._shardKey(cfg, i), JSON.stringify(s)));
     await this._put(cfg, this._indexKey(cfg), JSON.stringify({ shards: shards.length, count: items.length, updated: new Date().toISOString() }));
     // Best-effort cleanup of shards left over from a previously larger index.
     for (let i = shards.length; i < shards.length + 8; i++) this._delete(cfg, this._shardKey(cfg, i));

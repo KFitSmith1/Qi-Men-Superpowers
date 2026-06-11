@@ -50,11 +50,21 @@ async function openaiEmbed(texts) {
   // Batch to keep request sizes sane.
   for (let i = 0; i < texts.length; i += 96) {
     const batch = texts.slice(i, i + 96);
-    const res = await fetch(`${base}/embeddings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model, input: batch }),
-    });
+    let res, delay = 500;
+    for (let attempt = 0; attempt < 4; attempt++) {       // retry transient failures
+      try {
+        res = await fetch(`${base}/embeddings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+          body: JSON.stringify({ model, input: batch }),
+        });
+        if ((res.status === 429 || res.status >= 500) && attempt < 3) { await new Promise((r) => setTimeout(r, delay)); delay *= 2.5; continue; }
+        break;
+      } catch (e) {
+        if (attempt < 3) { await new Promise((r) => setTimeout(r, delay)); delay *= 2.5; continue; }
+        throw e;
+      }
+    }
     if (!res.ok) throw new Error(`Embeddings error: ${(await res.text().catch(() => res.status)).slice(0, 200)}`);
     const data = await res.json();
     for (const row of data.data) out[i + row.index] = row.embedding;
