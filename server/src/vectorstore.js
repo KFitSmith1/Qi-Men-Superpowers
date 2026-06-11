@@ -30,6 +30,18 @@ const path = require('path');
 const BACKEND = (process.env.VECTOR_STORE || 'local').toLowerCase();
 const DATA_FILE = process.env.VECTOR_FILE || path.join(__dirname, '..', 'data', 'vectors.json');
 
+// Each InsForge upload is kept under this size so it clears the storage
+// gateway's request-body limit (the index is sharded across several files).
+const SHARD_BYTES = Number(process.env.INSFORGE_SHARD_BYTES || 450 * 1024);
+
+/** Round vector components to 6 decimals — shrinks the stored index a lot with
+ *  no meaningful effect on cosine similarity. */
+function roundVec(v) {
+  const o = new Array(v.length);
+  for (let i = 0; i < v.length; i++) o[i] = Math.round(v[i] * 1e6) / 1e6;
+  return o;
+}
+
 /* ---- cosine similarity -------------------------------------------------- */
 
 function cosine(a, b) {
@@ -64,9 +76,11 @@ const insforgeAdapter = {
     const object = process.env.INSFORGE_OBJECT || 'qms_vectors.json';
     return { base, key, bucket, object };
   },
-  _objectUrl(cfg) {
-    return `${cfg.base}/api/storage/buckets/${encodeURIComponent(cfg.bucket)}/objects/${encodeURIComponent(cfg.object)}`;
+  _url(cfg, key) {
+    return `${cfg.base}/api/storage/buckets/${encodeURIComponent(cfg.bucket)}/objects/${encodeURIComponent(key)}`;
   },
+  _shardKey(cfg, i) { return `${cfg.object.replace(/\.json$/i, '')}.${String(i).padStart(4, '0')}.json`; },
+  _indexKey(cfg) { return `${cfg.object.replace(/\.json$/i, '')}.index.json`; },
   async _ensureBucket(cfg) {
     // Create the bucket if it doesn't exist yet (private). Ignore 409 (exists).
     const res = await fetch(`${cfg.base}/api/storage/buckets`, {
@@ -78,27 +92,63 @@ const insforgeAdapter = {
       throw new Error(`InsForge create-bucket failed: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 160)}`);
     }
   },
+  async _put(cfg, key, text) {
+    const body = () => {
+      const fd = new FormData();
+      fd.append('file', new Blob([text], { type: 'application/json' }), key.split('/').pop());
+      return fd;
+    };
+    let res = await fetch(this._url(cfg, key), { method: 'PUT', headers: { 'x-api-key': cfg.key }, body: body() });
+    if (res.status === 404) { // bucket missing — create and retry once
+      await this._ensureBucket(cfg);
+      res = await fetch(this._url(cfg, key), { method: 'PUT', headers: { 'x-api-key': cfg.key }, body: body() });
+    }
+    if (!res.ok) throw new Error(`InsForge upload failed: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 160)}`);
+  },
+  async _getJson(cfg, key) {
+    const res = await fetch(this._url(cfg, key), { headers: { 'x-api-key': cfg.key } });
+    if (!res.ok) return null;
+    try { return JSON.parse(await res.text()); } catch { return null; }
+  },
+  async _delete(cfg, key) {
+    await fetch(this._url(cfg, key), { method: 'DELETE', headers: { 'x-api-key': cfg.key } }).catch(() => {});
+  },
   async load() {
     const cfg = this._cfg();
-    const res = await fetch(this._objectUrl(cfg), { headers: { 'x-api-key': cfg.key } });
-    if (res.status === 404) return [];                       // bucket/object not there yet
-    if (!res.ok) throw new Error(`InsForge download failed: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 160)}`);
-    const text = await res.text();
-    try { return JSON.parse(text); } catch { return []; }
+    const idx = await this._getJson(cfg, this._indexKey(cfg));
+    if (idx && Number.isInteger(idx.shards)) {
+      const out = [];
+      for (let i = 0; i < idx.shards; i++) {
+        const part = await this._getJson(cfg, this._shardKey(cfg, i));
+        if (Array.isArray(part)) out.push(...part);
+      }
+      return out;
+    }
+    // Backward-compat: a single legacy blob from before sharding.
+    const legacy = await this._getJson(cfg, cfg.object);
+    return Array.isArray(legacy) ? legacy : [];
   },
   async save(items) {
     const cfg = this._cfg();
-    const put = () => {
-      const fd = new FormData();
-      fd.append('file', new Blob([JSON.stringify(items)], { type: 'application/json' }), cfg.object);
-      return fetch(this._objectUrl(cfg), { method: 'PUT', headers: { 'x-api-key': cfg.key }, body: fd });
-    };
-    let res = await put();
-    if (res.status === 404) {            // bucket missing — create it and retry once
-      await this._ensureBucket(cfg);
-      res = await put();
+    // Split into shards small enough to clear the storage gateway's body limit.
+    const shards = [];
+    let cur = [];
+    let curBytes = 2;
+    for (const it of items) {
+      const rec = { id: it.id, vector: roundVec(it.vector || []), text: it.text, meta: it.meta };
+      const len = JSON.stringify(rec).length + 1;
+      if (cur.length && curBytes + len > SHARD_BYTES) { shards.push(cur); cur = []; curBytes = 2; }
+      cur.push(rec);
+      curBytes += len;
     }
-    if (!res.ok) throw new Error(`InsForge upload failed: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 160)}`);
+    if (cur.length) shards.push(cur);
+
+    for (let i = 0; i < shards.length; i++) {
+      await this._put(cfg, this._shardKey(cfg, i), JSON.stringify(shards[i]));
+    }
+    await this._put(cfg, this._indexKey(cfg), JSON.stringify({ shards: shards.length, count: items.length, updated: new Date().toISOString() }));
+    // Best-effort cleanup of shards left over from a previously larger index.
+    for (let i = shards.length; i < shards.length + 8; i++) this._delete(cfg, this._shardKey(cfg, i));
   },
 };
 
