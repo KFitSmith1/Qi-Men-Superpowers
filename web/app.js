@@ -26,6 +26,7 @@ function setLang(lang) {
     b.classList.toggle('active', b.dataset.setlang === lang));
   refreshOptionLabels();
   if (state.tab === 'chat' && document.getElementById('chat-panel')) renderChat();
+  else if (lang !== 'zh') { const rb = document.querySelector('#tab-body .reading'); if (rb) autoTranslateReading(rb); }
 }
 
 const TABS = ['bazi', 'plate', 'caiguan', 'hunlian', 'xingge', 'event', 'zhanduan', 'yaoce', 'xunshijieyun', 'huaqizhen', 'yishenhuanjiang', 'chat'];
@@ -685,9 +686,11 @@ function formatReading(raw) {
   let html = '';
   let inItem = false;
   const closeItem = () => { if (inItem) { html += '</div>'; inItem = false; } };
+  // Wrap untranslated Chinese so the LLM fallback (autoTranslateReading) can find it.
+  const zk = (h) => `<span class="zh-keep">${h}</span>`;
   const sectionBar = (zh) => {
     const en = SECTION_EN[zh] || cnEn(zh);
-    html += `<h4 class="rd-section">${en ? bi(deco(zh), esc(en)) : deco(zh)}</h4>`;
+    html += `<h4 class="rd-section">${en ? bi(deco(zh), esc(en)) : zk(deco(zh))}</h4>`;
   };
 
   for (let i = 0; i < lines.length; i++) {
@@ -702,7 +705,7 @@ function formatReading(raw) {
     if ((indent === 0 && /^[=]{3,}$/.test(next)) || (i === 0 && !/[：:]/.test(trimmed))) { // report title
       closeItem();
       const tEn = TITLE_EN[trimmed] || cnEn(trimmed);
-      html += `<h3 class="rd-title">${tEn ? bi(deco(trimmed), esc(tEn)) : deco(trimmed)}</h3>`;
+      html += `<h3 class="rd-title">${tEn ? bi(deco(trimmed), esc(tEn)) : zk(deco(trimmed))}</h3>`;
       continue;
     }
     const sec = trimmed.match(/^={2,}\s*(.+?)\s*={2,}$/);       // === Section ===
@@ -712,7 +715,7 @@ function formatReading(raw) {
     if (dash) {
       closeItem();
       const en = cnEn(dash[1]);
-      html += `<h5 class="rd-sub">${en ? bi(deco(dash[1]), esc(en)) : deco(dash[1])}</h5>`;
+      html += `<h5 class="rd-sub">${en ? bi(deco(dash[1]), esc(en)) : zk(deco(dash[1]))}</h5>`;
       continue;
     }
     const pal = trimmed.match(/^\[\s*(.+?)\s*[｜|]\s*(.+?)\s*[｜|]\s*(.+?)\s*\]$/); // [ 坎1宫｜北｜水 ]
@@ -720,7 +723,7 @@ function formatReading(raw) {
       closeItem();
       const zh = `${pal[1]} · ${pal[2]} · ${pal[3]}`;
       const en = [cnEn(pal[1]), cnEn(pal[2]), cnEn(pal[3])].filter(Boolean).join(' · ');
-      html += `<h4 class="rd-palace">${en ? bi(deco(zh), esc(en)) : deco(zh)}</h4>`;
+      html += `<h4 class="rd-palace">${en ? bi(deco(zh), esc(en)) : zk(deco(zh))}</h4>`;
       continue;
     }
     const brk = trimmed.match(/^\[([^\]｜|]{2,10})\]$/);        // [出生局] style heads
@@ -730,7 +733,7 @@ function formatReading(raw) {
     if (sym) {
       const zh = `${sym[1]} · ${sym[2]}`;
       const en = [keyGloss(sym[1]) || cnEn(sym[1]), cnEn(sym[2])].filter(Boolean).join(' · ');
-      html += `<h5 class="rd-sub">${en ? bi(deco(zh), esc(en)) : deco(zh)}</h5>`;
+      html += `<h5 class="rd-sub">${en ? bi(deco(zh), esc(en)) : zk(deco(zh))}</h5>`;
       continue;
     }
 
@@ -749,7 +752,7 @@ function formatReading(raw) {
     if (kv) {
       const label = kv[1].trim(), val = kv[2];
       const g = keyGloss(label) || cnEn(label);
-      const kHtml = g ? `<span class="has-en"><span class="zh">${deco(label)}</span><span class="k-en">${esc(g)}</span></span>` : deco(label);
+      const kHtml = g ? `<span class="has-en"><span class="zh">${deco(label)}</span><span class="k-en">${esc(g)}</span></span>` : zk(deco(label));
       if (!val) html += `<div class="rd-kv-h" style="${indentRem(indent)}">${kHtml}</div>`;
       else html += `<div class="rd-kv" style="${indentRem(indent)}"><span class="rd-k">${kHtml}</span><span class="rd-v">${rdPair(deco(val), cnEnList(val))}</span></div>`;
       continue;
@@ -1073,8 +1076,35 @@ async function loadTab(tab) {
       if (r && r.text) captureReadingContext(tab, r.text);
     }
     body.innerHTML = html;
+    autoTranslateReading(body);
   } catch (e) {
     body.innerHTML = tabHeading(tab) + `<div class="error-box">${bi('分析失败', 'Analysis failed')}: ${esc(e.message)}</div>`;
+  }
+}
+
+/* LLM fallback: translate any Chinese fragment the lexicon couldn't cover, so
+   English mode is never left with stray hanzi. No-op when nothing is missing. */
+const _trCache = new Map();
+async function autoTranslateReading(root) {
+  if (document.body.dataset.lang === 'zh') return;             // Chinese mode wants Chinese
+  const els = [...root.querySelectorAll('.zh-keep')].filter((e) => /[一-鿿]/.test(e.textContent));
+  if (!els.length) return;
+  const need = [...new Set(els.map((e) => e.textContent.trim()))].filter((t) => !_trCache.has(t));
+  if (need.length) {
+    try {
+      const res = await fetch(apiUrl('/api/translate'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texts: need }),
+      });
+      const data = await res.json();
+      for (const [k, v] of Object.entries(data.translations || {})) _trCache.set(k, v);
+    } catch { /* offline / no provider — leave as-is */ }
+  }
+  for (const e of els) {
+    const en = _trCache.get(e.textContent.trim());
+    if (!en) continue;
+    e.classList.remove('zh-keep');
+    e.classList.add('has-en');
+    e.innerHTML = `<span class="zh">${e.innerHTML}</span><span class="rd-en">${esc(en)}</span>`;
   }
 }
 

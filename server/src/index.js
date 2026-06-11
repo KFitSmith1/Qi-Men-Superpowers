@@ -252,6 +252,33 @@ async function handleKnowledgeSync(req, res) {
   }
 }
 
+/** LLM fallback translation for reading fragments the lexicon can't cover.
+ *  Body: { texts: [...] } -> { translations: { src: english } }. Cached. */
+const translateCache = new Map();
+async function handleTranslate(req, res) {
+  let body;
+  try { body = await readBody(req); } catch (e) { return sendJson(res, e.status || 400, { error: e.message }); }
+  const texts = Array.isArray(body.texts) ? body.texts.map(String).slice(0, 200) : [];
+  const out = {};
+  const need = [];
+  for (const t of texts) {
+    if (translateCache.has(t)) out[t] = translateCache.get(t);
+    else if (/[一-鿿]/.test(t)) need.push(t);
+  }
+  if (need.length) {
+    try {
+      const tr = await llm.translateBatch([...new Set(need)], 'English');
+      for (const [k, v] of Object.entries(tr)) {
+        if (translateCache.size < 5000) translateCache.set(k, v);
+        out[k] = v;
+      }
+    } catch (e) {
+      console.error(`[${new Date().toISOString()}] /api/translate:`, e.message);
+    }
+  }
+  sendJson(res, 200, { translations: out });
+}
+
 /** Streaming chat over SSE. Body: { messages:[{role,content}], context?, lang? } */
 async function handleChat(req, res) {
   let body;
@@ -359,6 +386,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'POST' && reqPath === '/api/knowledge/sync') {
     return handleKnowledgeSync(req, res);
+  }
+  if (req.method === 'POST' && reqPath === '/api/translate') {
+    return handleTranslate(req, res);
   }
 
   const routeKey = `${req.method} ${reqPath}`;

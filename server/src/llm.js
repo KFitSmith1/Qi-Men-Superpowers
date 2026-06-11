@@ -193,4 +193,35 @@ async function streamChat({ messages, context, lang, onToken, onEvent, tools, ex
   }
 }
 
-module.exports = { streamChat, PROVIDER };
+/* ---- Batch translation (RAG reading fallback) --------------------------- */
+
+/** Translate an array of short Chinese strings -> { src: english }.
+ *  Returns {} for the stub provider or when no key is set (no-op fallback). */
+async function translateBatch(texts, target = 'English') {
+  if (!Array.isArray(texts) || !texts.length) return {};
+  if (PROVIDER !== 'openai' && PROVIDER !== 'insforge') return {};
+  const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
+  const key = process.env.OPENAI_API_KEY;
+  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  if (!key) return {};
+
+  const sys = `You translate short Chinese phrases from a BaZi / Qi Men Dun Jia (Chinese metaphysics) reading into concise, natural ${target}. Translate technical terms sensibly and keep it readable. Return ONLY JSON of the form {"out":[...]} — an array of translated strings with the same length and order as the input array.`;
+  const res = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model, temperature: 0, max_tokens: 2048,
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(texts) }],
+    }),
+  });
+  if (!res.ok) throw new Error(`translate error: HTTP ${res.status}`);
+  const data = await res.json();
+  let arr = null;
+  try { arr = JSON.parse(data.choices?.[0]?.message?.content || '{}').out; } catch { /* ignore */ }
+  const out = {};
+  if (Array.isArray(arr)) texts.forEach((t, i) => { if (arr[i]) out[t] = String(arr[i]); });
+  return out;
+}
+
+module.exports = { streamChat, translateBatch, PROVIDER };
