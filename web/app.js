@@ -961,12 +961,23 @@ function renderChatLog() {
     log.innerHTML = `<div class="chat-empty">${bi('问点什么吧，例如：「我今年的财运如何？」', 'Ask anything — e.g. “What’s my wealth outlook this year?”')}</div>`;
     return;
   }
-  log.innerHTML = chatState.messages.map((m) => {
+  const dots = '<span class="dots"><i></i><i></i><i></i></span>';
+  log.innerHTML = chatState.messages.map((m, i) => {
+    const live = chatState.streaming && m.role === 'assistant' && i === chatState.messages.length - 1;
+    const labelOf = (t) => (TOOL_LABELS[t] ? bi(TOOL_LABELS[t][0], TOOL_LABELS[t][1]) : t);
     let body = '';
+
+    // A tool is running and the final answer hasn't started streaming yet.
+    if (live && !m.content && m.tools && m.tools.length) {
+      const names = m.tools.map(labelOf).join(bi('、', ', '));
+      return bubbleHtml(m.role, `<div class="chat-thinking">🔮 ${bi('正在查阅', 'Consulting')} ${names}${dots}</div>`);
+    }
     if (m.tools && m.tools.length) {
-      const tags = m.tools.map((t) => `<span class="src-tag">${esc(TOOL_LABELS[t] ? bi(TOOL_LABELS[t][0], TOOL_LABELS[t][1]) : t)}</span>`).join('');
+      const tags = m.tools.map((t) => `<span class="src-tag">${esc(labelOf(t))}</span>`).join('');
       body += `<div class="chat-tools">${bi('调用', 'Consulted')}: ${tags}</div>`;
     }
+    if (live && !m.content) return bubbleHtml(m.role, body + `<div class="chat-thinking">${bi('思考中', 'Thinking')}${dots}</div>`);
+
     body += esc(m.content).replace(/\n/g, '<br>');
     if (m.sources && m.sources.length) {
       const tags = m.sources.map((s) => `<span class="src-tag">${esc(s.title)}</span>`).join('');
