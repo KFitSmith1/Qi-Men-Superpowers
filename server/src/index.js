@@ -305,7 +305,13 @@ async function handleChat(req, res) {
         const useful = hits.filter((h) => h.score > 0.15);
         if (useful.length) {
           context.retrieved = useful.map((h) => `(${h.meta?.title || h.id}) ${h.text}`);
-          send({ type: 'sources', items: useful.map((h) => ({ title: h.meta?.title || h.id, score: Number(h.score.toFixed(3)) })) });
+          // De-duplicate by document title (several chunks often share one PDF).
+          const byTitle = new Map();
+          for (const h of useful) {
+            const title = h.meta?.title || h.id;
+            if (!byTitle.has(title)) byTitle.set(title, Number(h.score.toFixed(3)));
+          }
+          send({ type: 'sources', items: [...byTitle].map(([title, score]) => ({ title, score })) });
         }
       } catch (e) {
         console.error(`[${new Date().toISOString()}] /api/chat retrieval:`, e.message);

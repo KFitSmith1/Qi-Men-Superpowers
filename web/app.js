@@ -982,7 +982,8 @@ function renderChatLog() {
 
     body += esc(m.content).replace(/\n/g, '<br>');
     if (m.sources && m.sources.length) {
-      const tags = m.sources.map((s) => `<span class="src-tag">${esc(s.title)}</span>`).join('');
+      const titles = [...new Set(m.sources.map((s) => s.title))];
+      const tags = titles.map((t) => `<span class="src-tag">${esc(t)}</span>`).join(' ');
       body += `<div class="chat-sources">${bi('参考', 'Sources')}: ${tags}</div>`;
     }
     return bubbleHtml(m.role, body);
