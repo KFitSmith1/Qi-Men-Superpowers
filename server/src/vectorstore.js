@@ -67,20 +67,37 @@ const insforgeAdapter = {
   _objectUrl(cfg) {
     return `${cfg.base}/api/storage/buckets/${encodeURIComponent(cfg.bucket)}/objects/${encodeURIComponent(cfg.object)}`;
   },
+  async _ensureBucket(cfg) {
+    // Create the bucket if it doesn't exist yet (private). Ignore 409 (exists).
+    const res = await fetch(`${cfg.base}/api/storage/buckets`, {
+      method: 'POST',
+      headers: { 'x-api-key': cfg.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bucketName: cfg.bucket, isPublic: false }),
+    });
+    if (!res.ok && res.status !== 409) {
+      throw new Error(`InsForge create-bucket failed: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 160)}`);
+    }
+  },
   async load() {
     const cfg = this._cfg();
     const res = await fetch(this._objectUrl(cfg), { headers: { 'x-api-key': cfg.key } });
-    if (res.status === 404) return [];                       // index not uploaded yet
+    if (res.status === 404) return [];                       // bucket/object not there yet
     if (!res.ok) throw new Error(`InsForge download failed: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 160)}`);
     const text = await res.text();
     try { return JSON.parse(text); } catch { return []; }
   },
   async save(items) {
     const cfg = this._cfg();
-    // PUT the whole index as a JSON file (multipart/form-data, `file` field).
-    const fd = new FormData();
-    fd.append('file', new Blob([JSON.stringify(items)], { type: 'application/json' }), cfg.object);
-    const res = await fetch(this._objectUrl(cfg), { method: 'PUT', headers: { 'x-api-key': cfg.key }, body: fd });
+    const put = () => {
+      const fd = new FormData();
+      fd.append('file', new Blob([JSON.stringify(items)], { type: 'application/json' }), cfg.object);
+      return fetch(this._objectUrl(cfg), { method: 'PUT', headers: { 'x-api-key': cfg.key }, body: fd });
+    };
+    let res = await put();
+    if (res.status === 404) {            // bucket missing — create it and retry once
+      await this._ensureBucket(cfg);
+      res = await put();
+    }
     if (!res.ok) throw new Error(`InsForge upload failed: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 160)}`);
   },
 };
