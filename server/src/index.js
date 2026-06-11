@@ -349,6 +349,7 @@ async function handleChat(req, res) {
       messages,
       context,
       lang: body.lang || 'en',
+      tier: typeof body.modelTier === 'string' ? body.modelTier : 'auto',
       signal: ac.signal,
       tools: buildChatTools(context),
       executeTool: (name, args) => executeChatTool(name, args, context),

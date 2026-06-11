@@ -24,6 +24,51 @@
 
 const PROVIDER = (process.env.LLM_PROVIDER || 'stub').toLowerCase();
 
+/* ---- Model roster (OpenRouter one-key multi-model hub) -------------------
+ * Point OPENAI_BASE_URL at https://openrouter.ai/api/v1 with an OpenRouter key
+ * and the named tiers below become available; each is overridable via env
+ * (model slugs change — check openrouter.ai/models). With any other gateway
+ * (e.g. api.openai.com) every tier falls back to OPENAI_MODEL, so a
+ * single-model setup keeps working unchanged. */
+
+const IS_OPENROUTER = (process.env.OPENAI_BASE_URL || '').includes('openrouter');
+
+const TIER_DEFAULTS = {
+  default: 'openrouter/auto',            // or e.g. qwen/qwen3-235b-a22b
+  reasoning: 'deepseek/deepseek-r1',     // deep step-by-step analysis
+  premium: 'moonshotai/kimi-k2',         // premium agent/coding (set MODEL_PREMIUM to the K2.6 slug)
+  writing: 'openai/gpt-4o',              // writing & polish (or an anthropic/claude-* slug)
+  translate: 'openai/gpt-4o-mini',       // cheap utility translations
+};
+const TIER_ENV = {
+  default: 'MODEL_DEFAULT', reasoning: 'MODEL_REASONING', premium: 'MODEL_PREMIUM',
+  writing: 'MODEL_WRITING', translate: 'MODEL_TRANSLATE',
+};
+
+function modelFor(tier) {
+  const t = TIER_ENV[tier] ? tier : 'default';
+  const explicit = process.env[TIER_ENV[t]];
+  if (explicit) return explicit;
+  if (IS_OPENROUTER) return TIER_DEFAULTS[t];
+  return process.env.OPENAI_MODEL || 'gpt-4o-mini';
+}
+
+/* Reasoning models (R1-style) have unreliable function calling — don't offer
+   tools to these tiers. Override with MODEL_NO_TOOLS=tier1,tier2 (or empty). */
+const NO_TOOL_TIERS = new Set(
+  (process.env.MODEL_NO_TOOLS ?? 'reasoning').split(',').map((s) => s.trim()).filter(Boolean),
+);
+
+/** Heuristic auto-routing: pick a tier from the question itself. */
+function autoTier(q) {
+  const s = String(q || '');
+  if (/code|代码|程序|debug|regex|script\b|\bapi\b|json|sql|函数|bug/i.test(s)) return 'premium';
+  if (/why|为什么|怎么会|analy|分析|推理|reason|deduce|calculat|计算|step.?by.?step|prove|证明|逻辑|compare|对比|权衡|strateg|策略|深入|详细解释|explain in detail/i.test(s)) return 'reasoning';
+  if (/\bwrite\b|rewrite|polish|draft|compose|essay|poem|email|letter|文案|润色|改写|写一|翻译成|translate/i.test(s)) return 'writing';
+  if (s.length > 280) return 'reasoning'; // long, involved questions
+  return 'default';
+}
+
 /* ---- System persona ----------------------------------------------------- */
 
 function personaSystem(lang, context) {
@@ -101,11 +146,14 @@ async function stubStream({ messages, lang, onToken }) {
 
 function safeParse(s) { try { return JSON.parse(s || '{}'); } catch { return {}; } }
 
-async function openaiStream({ messages, context, lang, onToken, onEvent, tools, executeTool, signal }) {
+async function openaiStream({ messages, context, lang, onToken, onEvent, tools, executeTool, signal, model, maxTokens }) {
   const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
   const key = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  model = model || process.env.OPENAI_MODEL || 'gpt-4o-mini';
   if (!key) return stubStream({ messages, lang, onToken });
+  const extraHeaders = IS_OPENROUTER
+    ? { 'HTTP-Referer': 'https://github.com/KFitSmith1/Qi-Men-Superpowers', 'X-Title': 'Qi Men Superpowers' }
+    : {};
 
   const convo = buildMessages({ messages, context, lang });
   const useTools = Array.isArray(tools) && tools.length > 0;
@@ -113,12 +161,12 @@ async function openaiStream({ messages, context, lang, onToken, onEvent, tools, 
 
   // Multi-turn loop: the model may call tools (engine readings) before answering.
   for (let iter = 0; iter < 5; iter++) {
-    const body = { model, stream: true, max_tokens: 5000, messages: convo };
+    const body = { model, stream: true, max_tokens: maxTokens || 5000, messages: convo };
     if (useTools) { body.tools = tools.map((t) => t.schema); body.tool_choice = 'auto'; }
 
     const res = await fetch(`${base}/chat/completions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}`, ...extraHeaders },
       body: JSON.stringify(body),
       signal,
     });
@@ -149,6 +197,8 @@ async function openaiStream({ messages, context, lang, onToken, onEvent, tools, 
         try { choice = JSON.parse(data)?.choices?.[0]; } catch { continue; }
         if (!choice) continue;
         const delta = choice.delta || {};
+        const reso = delta.reasoning || delta.reasoning_content; // R1-style thinking stream
+        if (reso && onEvent) onEvent({ type: 'reasoning', text: reso });
         if (delta.content) { content += delta.content; full += delta.content; onToken(delta.content); }
         for (const tc of delta.tool_calls || []) {
           const idx = tc.index ?? 0;
@@ -182,11 +232,20 @@ async function openaiStream({ messages, context, lang, onToken, onEvent, tools, 
 
 /* ---- Dispatch ----------------------------------------------------------- */
 
-async function streamChat({ messages, context, lang, onToken, onEvent, tools, executeTool, signal }) {
+async function streamChat({ messages, context, lang, onToken, onEvent, tools, executeTool, signal, tier }) {
   switch (PROVIDER) {
     case 'openai':
-    case 'insforge': // InsForge gateway is assumed OpenAI-compatible until confirmed
-      return openaiStream({ messages, context, lang, onToken, onEvent, tools, executeTool, signal });
+    case 'insforge': { // InsForge gateway is assumed OpenAI-compatible until confirmed
+      const lastUser = [...(messages || [])].reverse().find((m) => m.role === 'user');
+      const t = tier && tier !== 'auto' && TIER_ENV[tier] ? tier : autoTier(lastUser?.content);
+      const model = modelFor(t);
+      if (onEvent) onEvent({ type: 'model', tier: t, model });
+      return openaiStream({
+        messages, context, lang, onToken, onEvent, executeTool, signal, model,
+        tools: NO_TOOL_TIERS.has(t) ? null : tools,
+        maxTokens: t === 'reasoning' ? 8192 : 5000, // R1 spends tokens thinking before answering
+      });
+    }
     case 'stub':
     default:
       return stubStream({ messages, lang, onToken });
@@ -202,7 +261,7 @@ async function translateBatch(texts, target = 'English') {
   if (PROVIDER !== 'openai' && PROVIDER !== 'insforge') return {};
   const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
   const key = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  const model = modelFor('translate');
   if (!key) return {};
 
   const sys = `You translate short Chinese phrases from a BaZi / Qi Men Dun Jia (Chinese metaphysics) reading into concise, natural ${target}. Translate technical terms sensibly and keep it readable. Return ONLY JSON of the form {"out":[...]} — an array of translated strings with the same length and order as the input array.`;
@@ -224,4 +283,4 @@ async function translateBatch(texts, target = 'English') {
   return out;
 }
 
-module.exports = { streamChat, translateBatch, PROVIDER };
+module.exports = { streamChat, translateBatch, modelFor, autoTier, PROVIDER };

@@ -102,6 +102,19 @@ environment variable.
   `OPENAI_API_KEY`, optional `OPENAI_BASE_URL` (default `https://api.openai.com/v1`)
   and `OPENAI_MODEL` (default `gpt-4o-mini`).
 
+**1b · Multi-model via OpenRouter** — point `OPENAI_BASE_URL` at
+`https://openrouter.ai/api/v1` with an OpenRouter key and the chat gains a
+**model picker** (⚡ Auto / Fast / 🧠 Reasoning / Expert / ✍️ Writing) plus
+per-question **auto-routing** (analysis → reasoning, code → expert,
+drafting → writing). Tier defaults: `openrouter/auto`, `deepseek/deepseek-r1`,
+`moonshotai/kimi-k2`, `openai/gpt-4o` — each overridable via
+`MODEL_DEFAULT/REASONING/PREMIUM/WRITING/TRANSLATE` (slugs:
+openrouter.ai/models). Reasoning models stream their chain-of-thought live and
+it collapses into a "🧠 Reasoning" disclosure above the answer; engine tools are
+withheld from R1-style tiers (`MODEL_NO_TOOLS`, default `reasoning`) since
+their function calling is unreliable. Non-OpenRouter setups are unaffected —
+every tier falls back to `OPENAI_MODEL`.
+
 **2 · Embeddings** — `EMBEDDINGS_PROVIDER`
 - `hash` — offline deterministic vectorizer (no keys; used for tests/fallback)
 - `openai` (default when `OPENAI_API_KEY` is set) — `text-embedding-3-small`

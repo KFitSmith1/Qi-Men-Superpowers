@@ -1116,7 +1116,17 @@ function activateTab(tab) {
 
 /* ---------------- Chat (Ask) tab ---------------- */
 
-const chatState = { messages: [], streaming: false, speak: false };
+const chatState = { messages: [], streaming: false, speak: false, modelTier: 'auto' };
+
+/* Model tiers offered by the backend roster (OpenRouter one-key hub).
+   'auto' lets the server route per question. */
+const MODEL_TIERS = [
+  ['auto', '⚡ 自动', '⚡ Auto'],
+  ['default', '快速', 'Fast'],
+  ['reasoning', '🧠 深度推理', '🧠 Reasoning'],
+  ['premium', '高手', 'Expert'],
+  ['writing', '✍️ 写作', '✍️ Writing'],
+];
 
 /* Friendly labels for the engine reading tools the model can call. */
 const TOOL_LABELS = {
@@ -1172,14 +1182,22 @@ function renderChatLog() {
       const names = m.tools.map(labelOf).join(bi('、', ', '));
       return bubbleHtml(m.role, `<div class="chat-thinking">🔮 ${bi('正在查阅', 'Consulting')} ${names}${dots}</div>`);
     }
+    // A reasoning model is thinking out loud — show the tail of the live thought stream.
+    if (live && !m.content && m.reasoning) {
+      return bubbleHtml(m.role, `<div class="chat-thinking">🧠 ${bi('深度推理中', 'Reasoning')}${dots}</div><div class="chat-reasoning-live">${esc(m.reasoning.slice(-600)).replace(/\n/g, '<br>')}</div>`);
+    }
     if (live && !m.content) return bubbleHtml(m.role, body + `<div class="chat-thinking">${bi('思考中', 'Thinking')}${dots}</div>`);
 
+    if (m.reasoning && m.content) {
+      body += `<details class="chat-reso"><summary>🧠 ${bi('推理过程', 'Reasoning')}</summary><div>${esc(m.reasoning).replace(/\n/g, '<br>')}</div></details>`;
+    }
     body += esc(m.content).replace(/\n/g, '<br>');
     if (m.sources && m.sources.length) {
       const titles = [...new Set(m.sources.map((s) => s.title))];
       const tags = titles.map((t) => `<span class="src-tag">${esc(t)}</span>`).join(' ');
       body += `<div class="chat-sources">${bi('参考', 'Sources')}: ${tags}</div>`;
     }
+    if (m.model && m.content) body += `<div class="chat-model-note">${esc(m.model)}</div>`;
     return bubbleHtml(m.role, body);
   }).join('');
   log.scrollTop = log.scrollHeight;
@@ -1193,6 +1211,8 @@ function renderChat() {
     <div id="chat-panel">
       <div id="chat-log"></div>
       <form id="chat-form" autocomplete="off">
+        <select id="chat-model" title="${t('选择模型', 'Choose model')}">${MODEL_TIERS.map(([v, zh, en]) =>
+          `<option value="${v}" ${chatState.modelTier === v ? 'selected' : ''}>${t(zh, en)}</option>`).join('')}</select>
         <textarea id="chat-input" rows="1" placeholder="${t('输入问题，回车发送…', 'Type a question, Enter to send…')}"></textarea>
         ${speechOk ? `<button type="button" id="chat-mic" title="${t('语音输入', 'Voice input')}" aria-label="voice">🎤</button>` : ''}
         ${ttsOk ? `<button type="button" id="chat-speak" class="${chatState.speak ? 'on' : ''}" title="${t('朗读回复', 'Read replies aloud')}" aria-label="speak">🔊</button>` : ''}
@@ -1208,6 +1228,7 @@ function renderChat() {
   form.addEventListener('submit', (e) => { e.preventDefault(); sendChat(input.value); input.value = ''; input.style.height = 'auto'; });
   if (ttsOk) $('#chat-speak').addEventListener('click', () => { chatState.speak = !chatState.speak; $('#chat-speak').classList.toggle('on', chatState.speak); if (!chatState.speak) window.speechSynthesis.cancel(); });
   if (speechOk) $('#chat-mic').addEventListener('click', startDictation);
+  $('#chat-model').addEventListener('change', (e) => { chatState.modelTier = e.target.value; });
 }
 
 async function sendChat(text) {
@@ -1224,7 +1245,7 @@ async function sendChat(text) {
     const res = await fetch(apiUrl('/api/chat'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: chatState.messages.slice(0, -1), context: chatContext(), lang: document.body.dataset.lang }),
+      body: JSON.stringify({ messages: chatState.messages.slice(0, -1), context: chatContext(), lang: document.body.dataset.lang, modelTier: chatState.modelTier }),
     });
     if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
     const reader = res.body.getReader();
@@ -1241,6 +1262,8 @@ async function sendChat(text) {
         if (!line) continue;
         let ev; try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
         if (ev.type === 'token') { chatState.messages[idx].content += ev.text; renderChatLog(); }
+        else if (ev.type === 'reasoning') { chatState.messages[idx].reasoning = (chatState.messages[idx].reasoning || '') + ev.text; renderChatLog(); }
+        else if (ev.type === 'model') { chatState.messages[idx].model = ev.model; }
         else if (ev.type === 'sources') { chatState.messages[idx].sources = ev.items; renderChatLog(); }
         else if (ev.type === 'tool') { (chatState.messages[idx].tools ||= []).push(ev.name); renderChatLog(); }
         else if (ev.type === 'error') { chatState.messages[idx].content += `\n[${ev.message}]`; renderChatLog(); }
