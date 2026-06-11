@@ -66,6 +66,77 @@ fly launch --no-deploy        # detects the Dockerfile; creates fly.toml
 fly deploy
 ```
 
+## Hostinger KVM VPS (Docker + HTTPS)
+
+A Hostinger **VPS** (root SSH, Docker, bash) runs the whole app — API, frontend,
+and the OpenAI/InsForge calls. (Hostinger's *shared*/PHP plans cannot: they
+can't keep a Node process alive or spawn `bash`.)
+
+**1 · Point your domain at the VPS.** In Hostinger → Domains → DNS, add an `A`
+record for `@` (and `www`) to the VPS IP.
+
+**2 · SSH in and install Docker.**
+```bash
+ssh root@<vps-ip>
+curl -fsSL https://get.docker.com | sh
+```
+(Hostinger also offers a one-click Docker VPS template; either is fine.)
+
+**3 · Get the code and create an env file.**
+```bash
+git clone <your-repo-url> qms && cd qms
+cp .env.example .env          # then edit .env — see the chat/RAG block below
+```
+Minimum `.env` for the chat + knowledge base:
+```bash
+LLM_PROVIDER=openai
+OPENAI_API_KEY=<rotated OpenAI key>
+OPENAI_MODEL=gpt-4o-mini
+EMBEDDINGS_PROVIDER=openai
+VECTOR_STORE=insforge
+INSFORGE_BASE_URL=https://<project>.us-east.insforge.app
+INSFORGE_API_KEY=<rotated InsForge key>
+INSFORGE_BUCKET=qms-knowledge
+```
+
+**4 · Run it.** Compose reads `.env` automatically:
+```bash
+docker compose up --build -d
+docker compose logs -f        # look for: Knowledge base: N chunks loaded from insforge
+```
+The app is now on `http://<vps-ip>:8787`.
+
+**5 · HTTPS on your domain (Caddy auto-TLS).** Simplest reverse proxy — one file,
+automatic Let's Encrypt certs:
+```bash
+# /root/qms/Caddyfile
+yourdomain.com {
+    reverse_proxy localhost:8787
+}
+```
+```bash
+docker run -d --name caddy --restart unless-stopped --network host \
+  -v /root/qms/Caddyfile:/etc/caddy/Caddyfile \
+  -v caddy_data:/data caddy:2
+```
+Your app is live at `https://yourdomain.com`. (Open ports 80/443 in Hostinger's
+firewall; you can stop exposing 8787 publicly once Caddy is in front.)
+
+**6 · Load the knowledge base.** Run ingest **on your own machine**, where your
+Obsidian vault lives — it embeds the notes and uploads the index to InsForge,
+which the VPS then reads. No need to copy the vault to the server:
+```bash
+cd server
+LLM_PROVIDER=openai OPENAI_API_KEY=… EMBEDDINGS_PROVIDER=openai \
+VECTOR_STORE=insforge INSFORGE_BASE_URL=https://<project>.us-east.insforge.app \
+INSFORGE_API_KEY=… INSFORGE_BUCKET=qms-knowledge \
+npm run insforge:check && npm run ingest -- /path/to/your/vault
+```
+Restart the VPS container afterward (`docker compose restart`) so it reloads the
+updated index, or just redeploy.
+
+**Updating later:** `git pull && docker compose up --build -d`.
+
 ## Without Docker (any Node VM)
 
 ```bash

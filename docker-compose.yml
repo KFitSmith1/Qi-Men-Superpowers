@@ -12,4 +12,17 @@ services:
       # static web/ on here.now). For the single-container deploy the app is
       # same-origin and this can stay unset.
       - CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN:-*}
+      # Chat ("Ask" tab) — language model. Defaults to an offline stub if unset.
+      - LLM_PROVIDER=${LLM_PROVIDER:-stub}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-}
+      # RAG — embeddings + vector store (InsForge storage bucket).
+      - EMBEDDINGS_PROVIDER=${EMBEDDINGS_PROVIDER:-}
+      - EMBEDDINGS_MODEL=${EMBEDDINGS_MODEL:-}
+      - VECTOR_STORE=${VECTOR_STORE:-local}
+      - INSFORGE_BASE_URL=${INSFORGE_BASE_URL:-}
+      - INSFORGE_API_KEY=${INSFORGE_API_KEY:-}
+      - INSFORGE_BUCKET=${INSFORGE_BUCKET:-}
+      - INSFORGE_OBJECT=${INSFORGE_OBJECT:-}
     restart: unless-stopped
