@@ -159,6 +159,7 @@ const routes = {
       embeddings: embeddings.PROVIDER,
       vectorStore: vectorstore.BACKEND,
       knowledgeChunks: await vectorstore.count().catch(() => null),
+      autoIngest: knowledge.status(),
     },
   }),
 };

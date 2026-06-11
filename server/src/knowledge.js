@@ -31,6 +31,15 @@ function cfg() {
 
 function enabled() { const c = cfg(); return Boolean(c.base && c.key && c.bucket); }
 
+// Last-sync status, surfaced via /api/health.
+let lastSync = null;   // { at, files, changedFiles, newChunks, totalChunks }
+let lastError = null;  // { at, message }
+
+function status() {
+  const c = cfg();
+  return { enabled: enabled(), bucket: enabled() ? c.bucket : null, lastSync, lastError };
+}
+
 const headers = (c) => ({ 'x-api-key': c.key });
 const objUrl = (c, key) => `${c.base}/api/storage/buckets/${encodeURIComponent(c.bucket)}/objects/${encodeURIComponent(key)}`;
 
@@ -72,34 +81,42 @@ async function download(c, key) {
 /** Scan the bucket and ingest new/changed documents. */
 async function sync() {
   if (!enabled()) return { enabled: false };
-  const c = cfg();
-  const objects = (await listObjects(c)).filter((o) => /\.(md|txt|pdf)$/i.test(o.key || ''));
-  const manifest = await getManifest(c);
+  try {
+    const c = cfg();
+    const objects = (await listObjects(c)).filter((o) => /\.(md|txt|pdf)$/i.test(o.key || ''));
+    const manifest = await getManifest(c);
 
-  const records = [];
-  let changedFiles = 0;
-  for (const o of objects) {
-    const key = o.key;
-    const size = o.size ?? 0;
-    if (manifest[key] === size) continue; // unchanged — skip
-    let text;
-    try { text = documents.extractBuffer(key, await download(c, key)); }
-    catch (e) { console.warn(`  knowledge: skip ${key}: ${e.message}`); continue; }
-    manifest[key] = size;
-    if (!text || !text.trim()) continue;
-    const title = key.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
-    chunkNote(text).forEach((ch, i) => records.push({
-      id: `bucket:${key}#${i}`, text: ch.text, meta: { title, path: key, heading: ch.heading || '', size },
-    }));
-    changedFiles++;
-  }
+    const records = [];
+    let changedFiles = 0;
+    for (const o of objects) {
+      const key = o.key;
+      const size = o.size ?? 0;
+      if (manifest[key] === size) continue; // unchanged — skip
+      let text;
+      try { text = documents.extractBuffer(key, await download(c, key)); }
+      catch (e) { console.warn(`  knowledge: skip ${key}: ${e.message}`); continue; }
+      manifest[key] = size;
+      if (!text || !text.trim()) continue;
+      const title = key.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
+      chunkNote(text).forEach((ch, i) => records.push({
+        id: `bucket:${key}#${i}`, text: ch.text, meta: { title, path: key, heading: ch.heading || '', size },
+      }));
+      changedFiles++;
+    }
 
-  if (records.length) {
-    const vecs = await embeddings.embed(records.map((r) => r.text));
-    await store.upsert(records.map((r, i) => ({ id: r.id, vector: vecs[i], text: r.text, meta: r.meta })));
-    await putManifest(c, manifest);
+    if (records.length) {
+      const vecs = await embeddings.embed(records.map((r) => r.text));
+      await store.upsert(records.map((r, i) => ({ id: r.id, vector: vecs[i], text: r.text, meta: r.meta })));
+      await putManifest(c, manifest);
+    }
+    const summary = { enabled: true, files: objects.length, changedFiles, newChunks: records.length, totalChunks: await store.count() };
+    lastSync = { at: new Date().toISOString(), ...summary };
+    lastError = null;
+    return summary;
+  } catch (e) {
+    lastError = { at: new Date().toISOString(), message: e.message };
+    throw e;
   }
-  return { enabled: true, files: objects.length, changedFiles, newChunks: records.length, totalChunks: await store.count() };
 }
 
-module.exports = { sync, enabled };
+module.exports = { sync, enabled, status };
