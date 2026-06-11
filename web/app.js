@@ -172,6 +172,20 @@ const KEY_EN = {
   '时辰': 'Hour', '月份': 'Month', '生肖': 'Zodiac', '藏干': 'Hidden stems', '饮食': 'Food & drink',
   '静物': 'Still objects', '屋宅': 'Dwellings', '行为': 'Behaviour', '原型': 'Archetype',
   '性格': 'Character', '吉凶': 'Auspice', '名称': 'Name', '五行': 'Element',
+  // romance (婚恋) section labels
+  '日干(自己)': 'Day Stem (self)', '干合(配偶星)': 'Stem Combination (Spouse Star)',
+  '六合(姻缘媒人)': 'Harmony (Matchmaker)', '脱单方案': 'Finding a Partner', '方法': 'Method',
+  '禁忌方位': 'Forbidden Directions', '禁忌': 'Taboo', '简化版': 'Simplified',
+  '沐浴位(桃花位)': 'Bath Position (Peach Blossom)', '三奇': 'Three Wonders',
+  '催桃花': 'Boosting Peach Blossom', '桃花检测': 'Peach Blossom Check', '烂桃花': 'Bad Peach Blossom',
+  '斩桃花': 'Cutting Peach Blossom', '镇压目标宫位': 'Suppression target palace', '镇压': 'Suppress',
+  '镇压壬癸': 'Suppress Ren/Gui', '空亡影响': 'Void Influence', '解空亡': 'Resolve the Void',
+  '艮坤刑迫': 'Gen–Kun Punishment & Pressure', '孤辰寡宿': 'Lonely & Widow Stars', '组': 'Group',
+  '孤辰': 'Lonely Star', '寡宿': 'Widow Star', '化解孤辰': 'Resolve Lonely Star', '化解寡宿': 'Resolve Widow Star',
+  '增加情趣': 'Enhancing Intimacy', '催情催对方': 'Arousing Your Partner', '情趣场合': 'Intimate Settings',
+  '丁(男)': 'Ding (male)', '癸(女)': 'Gui (female)', '三奇含义': 'Three Wonders — Meaning',
+  '有击刑和门迫': 'With Punishment & Forced-Gate', '保护干合(配偶),六合(人缘)': 'Protect the combination (spouse) & Harmony (popularity)',
+  '用化气阵化解': 'Resolve with the Qi Array',
 };
 const keyGloss = (label) => {
   if (KEY_EN[label]) return KEY_EN[label];
@@ -249,6 +263,42 @@ const EN_FIXED = {
     'Excess taboo: do not crowd one palace with too many mixed remedy objects.',
   '正确的时间做正确的事': 'Do the right thing at the right time.',
   '月令是天时大势，决定做事的难度和量级': 'The Monthly Order is the prevailing climate; it sets difficulty and scale.',
+  // romance (婚恋) explanatory sentences
+  '干合代表配偶/伴侣，戊合癸': 'The stem combination represents the spouse/partner; Wu combines with Gui.',
+  '人缘,合,媒,多,婚,恋,约,缘,人与人的亲密关系': 'Popularity, union, matchmaking, abundance, marriage, romance, dates, affinity — close human bonds.',
+  '把日干(戊)和干合(癸)放到一起': 'Place the Day Stem (Wu) and its stem-combination partner (Gui) together.',
+  '禁忌: 避免骗色话术操纵，不要随便泄露生辰八字，不要被坏人安排在沐浴位，会失身泄密': 'Taboo: avoid manipulative seduction; do not casually reveal your birth data; do not let bad actors place you in the Bath position — you could be compromised and leak secrets.',
+  '避免骗色话术操纵，不要随便泄露生辰八字，不要被坏人安排在沐浴位，会失身泄密': 'Avoid manipulative seduction; do not casually reveal your birth data; do not let bad actors place you in the Bath position — you could be compromised and leak secrets.',
+  '赤裸袒露,鱼水之欢,一夜情,淫荡,放纵,泄密': 'Nakedness, conjugal joy, one-night stands, lust, indulgence, leaked secrets.',
+  '艳遇,奇遇,一见钟情,乱道心,挑逗,性冲动,梦中情人,帅哥美女,海王,渣男渣女': 'Romantic encounters, chance meetings, love at first sight, a distracted heart, flirtation, sexual impulse, dream lovers, handsome men & pretty women, players, toxic partners.',
+  '桃花为放纵,刺激,爽,鱼水之欢,赤裸的男女关系': 'Peach Blossom is about indulgence, thrills, pleasure, conjugal joy, and naked male–female relations.',
+  '壬癸与干合同宫 — 风流': 'Ren/Gui sharing the palace with the stem combination — promiscuity.',
+  '将壬癸的象放入空亡/入墓宫的方位': 'Place imagery of Ren/Gui into the direction of a Void or Tomb palace.',
+  '将烂桃花象放入以上宫位方位': 'Place bad-Peach-Blossom imagery into the directions of the palaces above.',
+  '不同属相(生年地支)的孤辰和寡宿': 'Lonely and Widow stars by zodiac sign (birth-year branch).',
+  '器官,大小,耐久力': 'organs, size, stamina',
+  '器官,大小,耐受力': 'organs, size, endurance',
+  '男催癸,女催丁': 'A man boosts Gui; a woman boosts Ding.',
+  '生助丁癸,或将其放入日干宫': 'Feed and support Ding/Gui, or place them in the Day-Stem palace.',
+  '在丁宫放木火,生助丁': 'In the Ding palace, place Wood and Fire to feed Ding.',
+  '在癸宫放金水,生助癸': 'In the Gui palace, place Metal and Water to feed Gui.',
+  '情趣场合: 女方看到红色,男方看到蓝色,女方多带金玉首饰,房间点蜡烛': 'Intimate setting: the woman sees red, the man sees blue, the woman wears more gold & jade jewellery, and the room is lit with candles.',
+  '女方看到红色,男方看到蓝色,女方多带金玉首饰,房间点蜡烛': 'The woman sees red, the man sees blue, the woman wears more gold & jade jewellery, and the room is lit with candles.',
+  '姿势,花样,挑逗,不满足': 'Positions, variety, teasing, dissatisfaction.',
+  '短期将天干和干合放入伤门所在宫方位,适用特殊性癖,如角色扮演,SM,切记只能短期': 'Briefly place the stem and its combination in the Harm-Gate palace direction; suited to special fetishes such as role-play or SM — remember, short-term only.',
+  '性吸引力,极致的性魅力,致命吸引力': 'Sexual attraction, ultimate sex appeal, fatal attraction.',
+  '多穿毛绒绒,女性爱毛绒,男友魅力爆棚': 'Wear fluffy textures; women love plush fabrics; the boyfriend brims with charm.',
+  '养猫狗也是创造情趣,情感补偿,养大狗,情趣猛': 'Keeping cats or dogs also builds intimacy and emotional comfort; a big dog means fierce passion.',
+  '将蓝黑色带毛的东西放到日干宫': 'Place blue-black furry items in the Day-Stem palace.',
+  '简化版: 只取天干本身的象': 'Simplified: use only the stems’ own imagery.',
+  '只取天干本身的象': 'Use only the stems’ own imagery.',
+  '艮宫(东北)和坤宫(西南)属土(调和)，出问题则家庭出问题': 'The Gen (NE) and Kun (SW) palaces are Earth (harmonising); trouble here means trouble for the family.',
+  '有击刑和门迫: 非常伤害感情。遇庚+白虎更甚: 受情伤，情感关系复杂，多段不寻常的感情，自己或家庭父母，变故极多，伤害极大': 'With Punishment and Forced-Gate: very damaging to relationships. With Geng + White Tiger it is worse — heartbreak, tangled relationships, several unusual affairs, upheaval affecting you or your parents, and great harm.',
+  '保护干合(配偶),六合(人缘)': 'Protect the stem combination (spouse) and Harmony (popularity).',
+  '六合空亡 — 互相有意愿，也有意中人，但没有交往的机会': 'Harmony is Void — both are willing and each has someone in mind, but there is no chance to date.',
+  '在空亡所在宫位放空亡对应的形象': 'In the palace where the Void sits, place imagery matching that Void.',
+  '非常伤害感情。遇庚+白虎更甚: 受情伤，情感关系复杂，多段不寻常的感情，自己或家庭父母，变故极多，伤害极大': 'Very damaging to relationships. With Geng + White Tiger it is worse: heartbreak, tangled relationships, several unusual affairs, upheaval affecting you or your parents, and great harm.',
+  '用化气阵化解': 'Resolve with the Qi Array.',
 };
 
 /* Token glossary for templated lines — longest match wins. */
@@ -306,6 +356,40 @@ const EN_VOCAB = {
   '羊雕像或玩偶': 'goat statue or doll', '水盆代替': 'use a water basin instead',
   '牛': 'ox', '鸡': 'rooster', '猴': 'monkey', '狗': 'dog', '猪': 'pig', '羊': 'goat',
   '龙': 'dragon', '马': 'horse', '兔': 'rabbit', '蛇': 'snake', '鼠': 'rat',
+  // quality marker + romance (婚恋) vocabulary
+  '中': 'neutral', '自己': 'self', '配偶星': 'Spouse Star', '配偶': 'spouse', '伴侣': 'partner',
+  '干合': 'Stem Combination', '姻缘': 'marriage affinity', '媒人': 'matchmaker', '人缘': 'popularity',
+  '媒': 'matchmaking', '多': 'many', '婚': 'marriage', '恋': 'romance', '约': 'dating', '缘': 'affinity',
+  '人与人的亲密关系': 'human intimacy', '脱单': 'finding a partner', '桃花': 'Peach Blossom',
+  '放到一起': 'place together', '放入': 'place into', '可把': 'you may put', '的象': '’s imagery',
+  '或': 'or', '方位': 'direction', '宫方位': 'palace direction', '方法': 'method', '禁忌': 'taboo',
+  '更佳': 'is better', '尽量': 'as far as possible', '若能': 'if you can', '位': 'position',
+  '脾气暴躁': 'irascible temper', '抑郁症': 'depression', '警告': 'Warning', '情感伤害加重': 'emotional harm intensifies',
+  '三奇': 'Three Wonders', '丁奇': 'Ding-Wonder', '丙奇': 'Bing-Wonder', '乙奇': 'Yi-Wonder', '奇': 'Wonder',
+  '温柔': 'gentle', '如沐春风': 'like a spring breeze', '热辣': 'hot', '骚女': 'flirty woman', '猛男': 'macho man',
+  '妖艳': 'alluring', '玉女': 'jade maiden', '阴柔': 'soft & feminine', '艳遇': 'romantic encounter',
+  '奇遇': 'chance encounter', '一见钟情': 'love at first sight', '乱道心': 'distracts the heart',
+  '挑逗': 'flirtation', '性冲动': 'sexual impulse', '梦中情人': 'dream lover', '帅哥美女': 'handsome men & pretty women',
+  '海王': 'player', '渣男渣女': 'toxic partners', '催桃花': 'boost Peach Blossom', '刺激': 'thrilling',
+  '爽': 'pleasurable', '鱼水之欢': 'conjugal joy', '赤裸': 'naked', '男女关系': 'male–female relations',
+  '放纵': 'indulgence', '小花小草': 'small flowers & plants', '漂亮吊灯': 'a pretty chandelier',
+  '点蜡烛': 'light candles', '男闺蜜': 'male confidant', '女装大佬': 'cross-dresser', '妖人': 'enchanter',
+  '阴柔男性': 'soft-natured man', '桃花检测': 'Peach Blossom check', '烂桃花': 'bad Peach Blossom',
+  '私密': 'secrecy', '偷人': 'cheating', '风流': 'promiscuity', '斩桃花': 'cut Peach Blossom',
+  '镇压': 'suppress', '目标宫位': 'target palace', '解空亡': 'resolve the Void', '孤辰寡宿': 'Lonely & Widow stars',
+  '孤辰': 'Lonely Star', '寡宿': 'Widow Star', '组': 'group', '化解': 'resolve', '不同属相': 'different zodiac signs',
+  '生年地支': 'birth-year branch', '增加情趣': 'enhancing intimacy', '器官': 'organs', '大小': 'size',
+  '耐久力': 'stamina', '耐受力': 'endurance', '生助': 'feed & support', '情趣场合': 'intimate setting',
+  '女方': 'the woman', '男方': 'the man', '金玉首饰': 'gold & jade jewellery', '首饰': 'jewellery', '房间': 'the room',
+  '姿势': 'positions', '花样': 'variety', '不满足': 'unsatisfied', '角色扮演': 'role-play', '特殊性癖': 'special fetishes',
+  '短期': 'short-term', '性吸引力': 'sexual attraction', '极致的性魅力': 'ultimate sex appeal', '致命吸引力': 'fatal attraction',
+  '毛绒绒': 'fluffy', '魅力爆棚': 'bursting with charm', '情感补偿': 'emotional compensation', '情趣': 'intimacy',
+  '性魅力': 'sex appeal', '有': 'has', '男': 'male', '女': 'female',
+  '含义': 'meaning', '把': 'put', '对应': 'corresponding', '异性': 'the opposite sex',
+  '本人': 'oneself', '所在': 'where it sits', '形象': 'imagery', '宫位': 'palace', '在': 'in',
+  '和': 'and', '互相': 'mutually', '有意愿': 'willing', '有意中人': 'have a sweetheart',
+  '交往': 'dating', '机会': 'opportunity', '没有': 'no', '但': 'but', '也': 'also', '的天干': ' stem',
+  '化气阵': 'Qi Array', '用': 'use',
 };
 /* Wan Wu correspondence vocabulary — top terms across the engine's data
    tables (body, people, places, objects, animals, traits, events…). Used for
@@ -435,6 +519,7 @@ function cnEnTerm(t) {
    keep their hanzi (graceful fallback); below 40% coverage we give up. */
 function cnEnList(val) {
   const whole = String(val).trim();
+  if (EN_FIXED[whole]) return EN_FIXED[whole];                 // whole-sentence translations
   if (EN_VOCAB[whole] !== undefined) return EN_VOCAB[whole];   // short single values (北, 胎, 冬…)
   const parts = String(val).split(/[,，、]/).map((s) => s.trim()).filter(Boolean);
   if (parts.length < 3) {
@@ -448,7 +533,7 @@ function cnEnList(val) {
     if (e) { hit++; return e; }
     return p;
   });
-  if (hit / parts.length < 0.4) return null;
+  if (hit / parts.length < 0.4) return cnEn(whole);            // fall back to segmentation
   return out.join(', ');
 }
 
@@ -584,7 +669,7 @@ function formatReading(raw) {
     const kv = trimmed.match(/^([^：:，。]{1,16})[：:]\s*(.*)$/); // key: value
     if (kv) {
       const label = kv[1].trim(), val = kv[2];
-      const g = keyGloss(label);
+      const g = keyGloss(label) || cnEn(label);
       const kHtml = g ? `<span class="has-en"><span class="zh">${deco(label)}</span><span class="k-en">${esc(g)}</span></span>` : deco(label);
       if (!val) html += `<div class="rd-kv-h" style="${indentRem(indent)}">${kHtml}</div>`;
       else html += `<div class="rd-kv" style="${indentRem(indent)}"><span class="rd-k">${kHtml}</span><span class="rd-v">${rdPair(deco(val), cnEnList(val))}</span></div>`;
