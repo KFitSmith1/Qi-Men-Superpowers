@@ -124,8 +124,10 @@ calculations, so answers stay anchored to the computed reading and the corpus.
 When birth details are present, the backend also computes the BaZi chart (four
 pillars, strength, luck pillars, current-year pillar) and injects it every turn,
 and the model can **call the Qi Men reading modules as tools** — 财官 wealth /
-婚恋 romance / 性格 personality / 移神换将 remedy / 化气阵 array — to pull a full
-analysis mid-conversation (consulted modules appear as tags in the reply).
+婚恋 romance / 性格 personality / 移神换将 remedy / 化气阵 array / 寻时 timing — plus,
+when an event date/time is set, 问事 event / 占断 divination / 遥测 sensing — to
+pull a full analysis mid-conversation (consulted modules appear as tags in the
+reply). Event-based tools are offered only when the event time is available.
 
 ### Building the knowledge base from an Obsidian vault
 

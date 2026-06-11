@@ -931,6 +931,10 @@ const TOOL_LABELS = {
   personality_reading: ['性格', 'Personality'],
   remedy_reading: ['移神换将', 'Remedy'],
   array_placement: ['化气阵', 'Array'],
+  time_selection: ['寻时', 'Timing'],
+  event_reading: ['问事', 'Event'],
+  divination_reading: ['占断', 'Divination'],
+  cross_plate_sensing: ['遥测', 'Sensing'],
 };
 
 /* The latest computed reading text, captured so chat can ground answers in it. */

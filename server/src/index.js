@@ -182,36 +182,55 @@ function serveStatic(req, res) {
   });
 }
 
-/** Qi Men reading modules exposed to the chat model as callable tools. */
-const READING_TOOLS = {
-  wealth_career_reading: { module: 'caiguan', desc: 'Qi Men wealth & career reading (财官): seven wealth hazards, six-harm detection, monthly-decree relations, and industry symbols.' },
-  romance_reading: { module: 'hunlian', desc: 'Qi Men romance & relationship reading (婚恋): partner combinations, peach-blossom, lonely-star patterns.' },
-  personality_reading: { module: 'xingge', desc: 'Qi Men personality reading (性格) from the day & hour stem palaces.' },
-  remedy_reading: { module: 'yishenhuanjiang', desc: 'Transformation remedy (移神换将): removal, combination, drainage, and clash fixes for harmful patterns.' },
-  array_placement: { module: 'huaqizhen', desc: 'Array placement plan (化气阵): per-palace placements to suppress harmful energies.' },
+/** Qi Men reading modules exposed to the chat model as callable tools.
+ *  `needs` gates availability on what the request context provides (birth and/or
+ *  an event time); `params` declares extra arguments the model must supply. */
+const CHAT_TOOLS = {
+  wealth_career_reading: { module: 'caiguan', needs: ['birth'], desc: 'Qi Men wealth & career reading (财官): seven wealth hazards, six-harm detection, monthly-decree relations, and industry symbols.' },
+  romance_reading: { module: 'hunlian', needs: ['birth'], desc: 'Qi Men romance & relationship reading (婚恋): partner combinations, peach-blossom, lonely-star patterns.' },
+  personality_reading: { module: 'xingge', needs: ['birth'], desc: 'Qi Men personality reading (性格) from the day & hour stem palaces.' },
+  remedy_reading: { module: 'yishenhuanjiang', needs: ['birth'], desc: 'Transformation remedy (移神换将): removal, combination, drainage, and clash fixes for harmful patterns.' },
+  array_placement: { module: 'huaqizhen', needs: ['birth'], desc: 'Array placement plan (化气阵): per-palace placements to suppress harmful energies.' },
+  time_selection: { module: 'xunshijieyun', needs: ['birth'], desc: 'Auspicious timing (寻时借运): ranks 60 gan-zhi variant plates by six-harm count to find the best time windows.' },
+  event_reading: { module: 'event', needs: ['event'], params: ['question'], desc: 'Reading for a specific question about an event/situation (问事), using the event-time plate.' },
+  divination_reading: { module: 'zhanduan', needs: ['birth', 'event'], params: ['topic'], desc: 'Classical Qi Men divination judgment (占断) for the event, evaluated against ancient rule sets.' },
+  cross_plate_sensing: { module: 'yaoce', needs: ['birth', 'event'], desc: 'Cross-plate sensing (遥测): birth-plate protected stems placed on the event plate.' },
 };
 
-/** Tool schemas for the model (only offered when birth details are available). */
-function buildReadingTools(context) {
-  if (!context.birth) return null;
-  return Object.entries(READING_TOOLS).map(([name, info]) => ({
-    schema: {
-      type: 'function',
-      function: {
-        name,
-        description: `${info.desc} Uses the birth details already provided; call with no arguments.`,
-        parameters: { type: 'object', properties: {} },
-      },
-    },
-  }));
+function toolSchema(name, info) {
+  const properties = {};
+  const required = [];
+  if (info.params?.includes('question')) {
+    properties.question = { type: 'string', enum: qimen.EVENT_QUESTIONS, description: 'Question category (Chinese), best matching the user\'s question.' };
+    required.push('question');
+  }
+  if (info.params?.includes('topic')) {
+    properties.topic = { type: 'string', description: 'Optional short topic, e.g. 婚姻, 求财, 官司.' };
+  }
+  return { type: 'function', function: { name, description: info.desc, parameters: { type: 'object', properties, required } } };
 }
 
-async function executeReadingTool(name, _args, context) {
-  const info = READING_TOOLS[name];
+/** Offer only the tools whose required context (birth / event time) is present. */
+function buildChatTools(context) {
+  const have = { birth: Boolean(context.birth), event: Boolean(context.eventTime) };
+  const tools = Object.entries(CHAT_TOOLS)
+    .filter(([, info]) => info.needs.every((n) => have[n]))
+    .map(([name, info]) => ({ schema: toolSchema(name, info) }));
+  return tools.length ? tools : null;
+}
+
+async function executeChatTool(name, args, context) {
+  const info = CHAT_TOOLS[name];
   if (!info) return `Unknown tool "${name}".`;
-  if (!context.birth) return 'No birth details available — ask the user to enter their birth date and time.';
-  const r = await qimen.runModule({ module: info.module, birth: context.birth });
-  return r.text || '(no output)';
+  const opts = { module: info.module, birth: context.birth, eventTime: context.eventTime };
+  if (args?.question) opts.question = args.question;
+  if (args?.topic) opts.topic = args.topic;
+  try {
+    const r = await qimen.runModule(opts);
+    return r.text || '(no output)';
+  } catch (e) {
+    return `Could not run that reading: ${e.message}`;
+  }
 }
 
 /** Streaming chat over SSE. Body: { messages:[{role,content}], context?, lang? } */
@@ -268,8 +287,8 @@ async function handleChat(req, res) {
       context,
       lang: body.lang || 'en',
       signal: ac.signal,
-      tools: buildReadingTools(context),
-      executeTool: (name, args) => executeReadingTool(name, args, context),
+      tools: buildChatTools(context),
+      executeTool: (name, args) => executeChatTool(name, args, context),
       onToken: (t) => send({ type: 'token', text: t }),
       onEvent: (ev) => send(ev), // e.g. { type: 'tool', name }
     });
