@@ -47,6 +47,13 @@ function personaSystem(lang, context) {
     'remedies, array placement, auspicious timing, a specific event/situation, or divination,',
     'CALL the matching reading tool first to get the detailed Qi Men analysis, then explain its',
     'results in plain language. Be concrete and practical; avoid fatalism.',
+    'Give thorough, well-structured answers. Walk through your reasoning step by step: name the',
+    'specific chart factors you are using (pillars, day-master strength, the relevant ten-gods,',
+    'the active luck pillar, the current-year pillar) and explain what each one means and why it',
+    'matters for the question. Define any Chinese terms in plain language the first time you use',
+    'them. Organize the response with short headed sections or bullet points, and finish with a',
+    'short, practical "what this suggests" takeaway. Aim for depth and clarity over brevity, but',
+    'stay on-topic and do not pad with filler.',
     'Add a brief reminder that this is for cultural study and entertainment, not professional advice,',
     'only when giving health, legal, or financial-sounding guidance.',
     langRule,
@@ -106,7 +113,7 @@ async function openaiStream({ messages, context, lang, onToken, onEvent, tools, 
 
   // Multi-turn loop: the model may call tools (engine readings) before answering.
   for (let iter = 0; iter < 5; iter++) {
-    const body = { model, stream: true, max_tokens: 1024, messages: convo };
+    const body = { model, stream: true, max_tokens: 2048, messages: convo };
     if (useTools) { body.tools = tools.map((t) => t.schema); body.tool_choice = 'auto'; }
 
     const res = await fetch(`${base}/chat/completions`, {

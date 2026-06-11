@@ -978,10 +978,6 @@ function renderChatLog() {
       const names = m.tools.map(labelOf).join(bi('、', ', '));
       return bubbleHtml(m.role, `<div class="chat-thinking">🔮 ${bi('正在查阅', 'Consulting')} ${names}${dots}</div>`);
     }
-    if (m.tools && m.tools.length) {
-      const tags = m.tools.map((t) => `<span class="src-tag">${esc(labelOf(t))}</span>`).join('');
-      body += `<div class="chat-tools">${bi('调用', 'Consulted')}: ${tags}</div>`;
-    }
     if (live && !m.content) return bubbleHtml(m.role, body + `<div class="chat-thinking">${bi('思考中', 'Thinking')}${dots}</div>`);
 
     body += esc(m.content).replace(/\n/g, '<br>');
