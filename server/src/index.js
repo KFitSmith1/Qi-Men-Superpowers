@@ -26,6 +26,7 @@ const bazi = require('./bazi');
 const llm = require('./llm');
 const embeddings = require('./embeddings');
 const vectorstore = require('./vectorstore');
+const knowledge = require('./knowledge');
 const { trueSolarTime } = require('./solar');
 
 const PORT = Number(process.env.PORT || 8787);
@@ -233,6 +234,19 @@ async function executeChatTool(name, args, context) {
   }
 }
 
+/** Admin-only: ingest new/changed documents from the InsForge bucket. */
+async function handleKnowledgeSync(req, res) {
+  const token = process.env.ADMIN_TOKEN;
+  if (!token) return sendJson(res, 503, { error: 'sync disabled — set ADMIN_TOKEN to enable this endpoint' });
+  if (req.headers['x-admin-token'] !== token) return sendJson(res, 401, { error: 'unauthorized' });
+  if (!knowledge.enabled()) return sendJson(res, 400, { error: 'InsForge docs bucket not configured' });
+  try {
+    sendJson(res, 200, await knowledge.sync());
+  } catch (e) {
+    sendJson(res, 500, { error: e.message });
+  }
+}
+
 /** Streaming chat over SSE. Body: { messages:[{role,content}], context?, lang? } */
 async function handleChat(req, res) {
   let body;
@@ -332,6 +346,9 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && reqPath === '/api/chat') {
     return handleChat(req, res);
   }
+  if (req.method === 'POST' && reqPath === '/api/knowledge/sync') {
+    return handleKnowledgeSync(req, res);
+  }
 
   const routeKey = `${req.method} ${reqPath}`;
   const handler = routes[routeKey];
@@ -359,4 +376,15 @@ server.listen(PORT, () => {
   vectorstore.count()
     .then((n) => console.log(`Knowledge base: ${n} chunks loaded from "${vectorstore.BACKEND}"`))
     .catch((e) => console.warn(`Knowledge base unavailable (${vectorstore.BACKEND}): ${e.message} — chat will run without retrieval`));
+
+  // Auto-ingest documents dropped in the InsForge bucket.
+  if (knowledge.enabled() && process.env.KNOWLEDGE_SYNC_ON_BOOT !== 'false') {
+    knowledge.sync()
+      .then((r) => console.log(`Knowledge sync: ${r.newChunks || 0} new chunks from ${r.changedFiles || 0} changed file(s) (${r.files || 0} docs in bucket)`))
+      .catch((e) => console.warn(`Knowledge sync failed: ${e.message}`));
+  }
+  const syncMins = Number(process.env.KNOWLEDGE_SYNC_MINUTES || 0);
+  if (syncMins > 0 && knowledge.enabled()) {
+    setInterval(() => knowledge.sync().catch((e) => console.warn(`Knowledge sync failed: ${e.message}`)), syncMins * 60000).unref();
+  }
 });

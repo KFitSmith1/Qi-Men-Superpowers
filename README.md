@@ -144,8 +144,28 @@ npm run ingest -- /path/to/your/vault  # or any folder of .md / .txt / .pdf file
 
 Re-running merges by file path, so you can ingest a vault and a separate PDFs
 folder and they accumulate. After ingesting, restart the server so it reloads
-the index. (Uploading raw PDFs to a bucket alone does **not** affect retrieval —
-only ingested-and-embedded text is searchable.)
+the index.
+
+### Auto-ingest: drop files into the InsForge bucket
+
+Instead of running the CLI, you can upload `.pdf` / `.txt` / `.md` files straight
+to your InsForge storage bucket (dashboard or API). The server scans the bucket,
+extracts + embeds **new or changed** files (tracked by size in a small manifest,
+so nothing is re-embedded needlessly), and merges them into the index:
+
+- **On boot** automatically (when a bucket is configured; disable with
+  `KNOWLEDGE_SYNC_ON_BOOT=false`).
+- **On a timer** with `KNOWLEDGE_SYNC_MINUTES=N`.
+- **On demand** via `POST /api/knowledge/sync` — guarded by `ADMIN_TOKEN`
+  (the endpoint is disabled unless that env var is set):
+  ```bash
+  curl -X POST https://<your-domain>/api/knowledge/sync -H "x-admin-token: $ADMIN_TOKEN"
+  ```
+
+Set `INSFORGE_DOCS_BUCKET` (defaults to `INSFORGE_BUCKET`) and, optionally,
+`INSFORGE_DOCS_PREFIX` to limit the scan to a sub-folder. The vector-index and
+manifest blobs (`.json`) are ignored by the scan. Uploading raw files alone does
+**not** affect retrieval until a sync embeds them.
 
 `GET /api/health` reports the live chat config and the loaded chunk count under
 `chat`. See `.env.example` for the full list of variables.

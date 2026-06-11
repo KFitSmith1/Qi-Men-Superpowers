@@ -32,22 +32,30 @@ function findDocs(dir, out = []) {
   return out;
 }
 
-function extractText(file) {
-  const ext = path.extname(file).toLowerCase();
-  if (ext === '.md') return splitFrontmatter(fs.readFileSync(file, 'utf8')).body;
-  if (ext === '.txt') return fs.readFileSync(file, 'utf8');
-  if (ext === '.pdf') {
-    try {
-      return execFileSync('pdftotext', ['-layout', '-enc', 'UTF-8', '-nopgbrk', file, '-'],
-        { encoding: 'utf8', maxBuffer: 128 * 1024 * 1024 });
-    } catch (e) {
-      if (e.code === 'ENOENT') {
-        throw new Error('PDF support needs "pdftotext" (poppler). Install it: macOS `brew install poppler`, Debian/Ubuntu `apt-get install -y poppler-utils`.');
-      }
-      throw new Error(`pdftotext failed on ${path.basename(file)}: ${e.message}`);
+function pdfToText(buffer, label) {
+  try {
+    // Read the PDF from stdin so this works for both local files and downloads.
+    return execFileSync('pdftotext', ['-layout', '-enc', 'UTF-8', '-nopgbrk', '-', '-'],
+      { input: buffer, encoding: 'utf8', maxBuffer: 128 * 1024 * 1024 });
+  } catch (e) {
+    if (e.code === 'ENOENT') {
+      throw new Error('PDF support needs "pdftotext" (poppler). Install it: macOS `brew install poppler`, Debian/Ubuntu `apt-get install -y poppler-utils`.');
     }
+    throw new Error(`pdftotext failed on ${label}: ${e.message}`);
   }
+}
+
+/** Extract plain text from an in-memory file (used for bucket downloads). */
+function extractBuffer(filename, buffer) {
+  const ext = path.extname(filename).toLowerCase();
+  if (ext === '.md') return splitFrontmatter(buffer.toString('utf8')).body;
+  if (ext === '.txt') return buffer.toString('utf8');
+  if (ext === '.pdf') return pdfToText(buffer, path.basename(filename));
   return '';
+}
+
+function extractText(file) {
+  return extractBuffer(file, fs.readFileSync(file));
 }
 
 /**
@@ -72,4 +80,4 @@ function loadDocuments(dir, opts = {}) {
   return items;
 }
 
-module.exports = { loadDocuments, findDocs, extractText };
+module.exports = { loadDocuments, findDocs, extractText, extractBuffer };
