@@ -148,6 +148,12 @@ const routes = {
 
   'POST /api/qimen/wanwu': (body) => qimen.runWanwu(body),
 
+  // Knowledge-base inventory: which documents are actually searchable.
+  'GET /api/knowledge/docs': async () => ({
+    docs: await vectorstore.docs(),
+    autoIngest: knowledge.status(),
+  }),
+
   'GET /api/health': async () => ({
     ok: true,
     engine: 'qmenpowers (pure Bash, Zhi-Run, rotating plate)',

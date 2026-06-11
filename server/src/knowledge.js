@@ -88,15 +88,21 @@ async function sync() {
 
     const records = [];
     let changedFiles = 0;
+    const noTextFiles = [];   // present in the bucket but no extractable text (scans/image-only PDFs)
+    const errorFiles = [];    // download/extraction failed (will be retried next sync)
     for (const o of objects) {
       const key = o.key;
       const size = o.size ?? 0;
       if (manifest[key] === size) continue; // unchanged — skip
       let text;
       try { text = documents.extractBuffer(key, await download(c, key)); }
-      catch (e) { console.warn(`  knowledge: skip ${key}: ${e.message}`); continue; }
+      catch (e) { console.warn(`  knowledge: skip ${key}: ${e.message}`); errorFiles.push(`${key}: ${e.message}`.slice(0, 200)); continue; }
       manifest[key] = size;
-      if (!text || !text.trim()) continue;
+      if (!text || !text.trim()) {
+        console.warn(`  knowledge: "${key}" has no extractable text (scanned/image-only PDF?) — skipped`);
+        noTextFiles.push(key);
+        continue;
+      }
       const title = key.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
       chunkNote(text).forEach((ch, i) => records.push({
         id: `bucket:${key}#${i}`, text: ch.text, meta: { title, path: key, heading: ch.heading || '', size },
@@ -104,12 +110,19 @@ async function sync() {
       changedFiles++;
     }
 
-    if (records.length) {
-      const vecs = await embeddings.embed(records.map((r) => r.text));
-      await store.upsert(records.map((r, i) => ({ id: r.id, vector: vecs[i], text: r.text, meta: r.meta })));
+    if (records.length || noTextFiles.length) {
+      if (records.length) {
+        const vecs = await embeddings.embed(records.map((r) => r.text));
+        await store.upsert(records.map((r, i) => ({ id: r.id, vector: vecs[i], text: r.text, meta: r.meta })));
+      }
       await putManifest(c, manifest);
     }
-    const summary = { enabled: true, files: objects.length, changedFiles, newChunks: records.length, totalChunks: await store.count() };
+    const summary = {
+      enabled: true, files: objects.length, changedFiles, newChunks: records.length,
+      totalChunks: await store.count(),
+      ...(noTextFiles.length ? { noTextFiles: noTextFiles.slice(0, 20) } : {}),
+      ...(errorFiles.length ? { errorFiles: errorFiles.slice(0, 20) } : {}),
+    };
     lastSync = { at: new Date().toISOString(), ...summary };
     lastError = null;
     return summary;

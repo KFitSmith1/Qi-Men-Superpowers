@@ -209,4 +209,17 @@ async function search(q, k = 6) {
 
 async function count() { return (await ensureLoaded()).length; }
 
-module.exports = { upsert, search, count, BACKEND, cosine };
+/** Inventory: which documents are searchable, with chunk counts. */
+async function docs() {
+  const all = await ensureLoaded();
+  const map = new Map();
+  for (const x of all) {
+    const key = x.meta?.path || x.meta?.title || x.id;
+    const e = map.get(key) || { path: key, title: x.meta?.title || key, chunks: 0 };
+    e.chunks++;
+    map.set(key, e);
+  }
+  return [...map.values()].sort((a, b) => b.chunks - a.chunks);
+}
+
+module.exports = { upsert, search, count, docs, BACKEND, cosine };
