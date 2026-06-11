@@ -204,6 +204,17 @@ async function handleChat(req, res) {
     const messages = Array.isArray(body.messages) ? body.messages : [];
     const context = body.context || {};
 
+    // Auto-compute the BaZi chart from birth details so the model can interpret
+    // directly instead of asking the user to compute it elsewhere.
+    if (context.birth) {
+      try {
+        const summary = await bazi.chartSummary({ birth: context.birth, gender: context.gender === 'female' ? 'female' : 'male' });
+        context.chartText = summary + (context.chartText ? `\n\nPrior on-screen reading:\n${context.chartText}` : '');
+      } catch (e) {
+        console.error(`[${new Date().toISOString()}] /api/chat chart:`, e.message);
+      }
+    }
+
     // RAG: retrieve reference chunks for the latest user question.
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUser && (await vectorstore.count()) !== 0) {

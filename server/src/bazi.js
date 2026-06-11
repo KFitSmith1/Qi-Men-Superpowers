@@ -250,4 +250,38 @@ async function analyzeBazi(opts) {
   };
 }
 
-module.exports = { analyzeBazi, tenGod, STEM_ELEMENT, BRANCH_ELEMENT };
+/**
+ * Compact, factual text summary of a computed BaZi chart for use as LLM
+ * grounding context (so the chat can interpret without re-deriving anything).
+ * Includes the current year's pillar and the active luck pillar.
+ */
+async function chartSummary(opts) {
+  const bz = await analyzeBazi(opts);
+  const now = new Date();
+  const curYear = now.getUTCFullYear();
+  const birthYear = Number(bz.birth.slice(0, 4));
+  const age = curYear - birthYear;
+  const yearGz = ganzhiAt(curYear - 1984); // 1984 = 甲子 anchor
+  const yearTenGod = tenGod(bz.dayMaster.stem, yearGz[0]);
+  const lp = bz.luckPillars;
+  const active = lp.pillars.find((p) => age >= p.startAge && age < p.startAge + 10)
+    || (age < lp.pillars[0].startAge ? null : lp.pillars[lp.pillars.length - 1]);
+  const tg = (cn) => `${cn}/${TEN_GOD_EN[cn] || cn}`;
+
+  const lines = [
+    `BaZi chart (already computed — interpret directly) for birth ${bz.birth}, ${bz.gender}.`,
+    `Four Pillars: Year ${bz.pillars[0].ganzhi}, Month ${bz.pillars[1].ganzhi}, Day ${bz.pillars[2].ganzhi}, Hour ${bz.pillars[3].ganzhi}.`,
+    `Day Master: ${bz.dayMaster.stem} (${bz.dayMaster.elementEn}, ${bz.dayMaster.polarity}) — strength ${bz.strength.verdictEn} (seasonal state ${bz.strength.seasonalState}). ${bz.strength.note}`,
+    `Five Elements: ${bz.fiveElements.map((e) => `${e.elementEn} ${e.percent}%`).join(', ')}.`,
+    `Ten Gods on stems: ${bz.pillars.map((p) => `${p.nameEn} ${p.ganzhi} [${tg(p.tenGod)}]`).join(', ')}.`,
+    `Luck Pillars (大运, ${lp.directionEn}): ${lp.pillars.map((p) => `${p.ganzhi}[${tg(p.tenGod)}] ${p.startYear}-${p.endYear}`).join('; ')}.`,
+    `Current year ${curYear} is ${yearGz}; year stem relates to the Day Master as ${tg(yearTenGod)}. Person is ~${age} years old.`,
+    active
+      ? `Active luck pillar now: ${active.ganzhi} [${tg(active.tenGod)}] (${active.startYear}-${active.endYear}).`
+      : `Luck pillars begin at age ${lp.startAge}; the person is younger than the first luck pillar, so pre-luck (childhood) influences apply.`,
+    `Wealth note: the Wealth element is what the Day Master controls; 正财/偏财 (Direct/Indirect Wealth) ten-gods mark wealth stars. A year or luck pillar carrying Wealth ten-gods is a wealth-themed period; weigh it against Day Master strength.`,
+  ];
+  return lines.join('\n');
+}
+
+module.exports = { analyzeBazi, chartSummary, tenGod, STEM_ELEMENT, BRANCH_ELEMENT };
