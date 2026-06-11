@@ -120,6 +120,12 @@ async function testRag() {
   const hits = await store.search(q, 2);
   assert.strictEqual(hits[0].meta.title, 'wealth', `wealth query ranks wealth note first, got ${hits[0].meta.title}`);
 
+  // Document loader handles .md and .txt (PDF path needs poppler, skipped here).
+  fs.writeFileSync(path.join(vault, 'notes.txt'), 'Plain text note about the Officer star and career luck.');
+  const docs = require('../src/documents').loadDocuments(vault);
+  const titles = docs.map((d) => d.meta.title);
+  assert.ok(titles.includes('notes') && titles.includes('wealth'), `documents loader reads .txt and .md, got ${titles.join(',')}`);
+
   // Idempotent upsert (re-ingest does not duplicate).
   await store.upsert(items.map((s, j) => ({ id: s.id, vector: vectors[j], text: s.text, meta: s.meta })));
   assert.strictEqual(await store.count(), items.length, 'upsert is idempotent by id');

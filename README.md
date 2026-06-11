@@ -129,13 +129,23 @@ when an event date/time is set, 问事 event / 占断 divination / 遥测 sensin
 pull a full analysis mid-conversation (consulted modules appear as tags in the
 reply). Event-based tools are offered only when the event time is available.
 
-### Building the knowledge base from an Obsidian vault
+### Building the knowledge base (Obsidian vault, text, or PDFs)
+
+`ingest` reads every `.md`, `.txt`, and `.pdf` under a folder, chunks and embeds
+them, and uploads the index to the vector store. PDF text is extracted with
+`pdftotext` (poppler) — preinstalled in the Docker image; for local runs install
+it (`brew install poppler` / `apt-get install -y poppler-utils`).
 
 ```bash
 cd server
 npm run insforge:check                 # validate InsForge creds + bucket (if used)
-npm run ingest -- /path/to/your/vault  # chunk -> embed -> upsert the index
+npm run ingest -- /path/to/your/vault  # or any folder of .md / .txt / .pdf files
 ```
+
+Re-running merges by file path, so you can ingest a vault and a separate PDFs
+folder and they accumulate. After ingesting, restart the server so it reloads
+the index. (Uploading raw PDFs to a bucket alone does **not** affect retrieval —
+only ingested-and-embedded text is searchable.)
 
 `GET /api/health` reports the live chat config and the loaded chunk count under
 `chat`. See `.env.example` for the full list of variables.

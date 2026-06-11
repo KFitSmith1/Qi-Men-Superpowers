@@ -8,6 +8,11 @@ ENV LANG=C.UTF-8 \
     PORT=8787
 
 WORKDIR /app
+
+# poppler-utils provides `pdftotext` for PDF ingestion into the knowledge base.
+RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY engine/ engine/
 COPY server/ server/
 COPY web/ web/

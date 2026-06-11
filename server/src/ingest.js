@@ -2,25 +2,27 @@
 
 /*
  * RAG ingestion CLI.
- *   node src/ingest.js <vault-path>
- *   OBSIDIAN_VAULT=/path/to/vault node src/ingest.js
+ *   node src/ingest.js <folder-path>
+ *   OBSIDIAN_VAULT=/path/to/folder node src/ingest.js
  *
- * Loads an Obsidian vault, chunks each note, embeds the chunks
- * (EMBEDDINGS_PROVIDER), and upserts them into the vector store (VECTOR_STORE).
+ * Loads every supported document under the folder (.md, .txt, .pdf), chunks
+ * them, embeds the chunks (EMBEDDINGS_PROVIDER), and upserts them into the
+ * vector store (VECTOR_STORE). Re-running merges by id, so you can ingest a
+ * vault and a PDFs folder separately and they accumulate.
  */
 
-const obsidian = require('./obsidian');
+const documents = require('./documents');
 const embeddings = require('./embeddings');
 const store = require('./vectorstore');
 
 async function main() {
-  const vault = process.argv[2] || process.env.OBSIDIAN_VAULT;
-  if (!vault) {
-    console.error('Usage: node src/ingest.js <vault-path>   (or set OBSIDIAN_VAULT)');
+  const folder = process.argv[2] || process.env.OBSIDIAN_VAULT;
+  if (!folder) {
+    console.error('Usage: node src/ingest.js <folder-path>   (.md, .txt, .pdf — or set OBSIDIAN_VAULT)');
     process.exit(1);
   }
-  console.log(`Loading vault: ${vault}`);
-  const items = obsidian.loadVault(vault);
+  console.log(`Loading documents from: ${folder}`);
+  const items = documents.loadDocuments(folder);
   console.log(`Found ${items.length} chunks. Embedding via "${embeddings.PROVIDER}"…`);
   if (!items.length) { console.log('Nothing to ingest.'); return; }
 
