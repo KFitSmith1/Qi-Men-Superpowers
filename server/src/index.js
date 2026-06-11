@@ -179,7 +179,11 @@ function serveStatic(req, res) {
       res.end('Not found');
       return;
     }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
+      // Always revalidate so a redeploy's HTML/JS/CSS shows up without a hard refresh.
+      'Cache-Control': 'no-cache, must-revalidate',
+    });
     res.end(data);
   });
 }

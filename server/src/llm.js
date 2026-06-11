@@ -113,7 +113,7 @@ async function openaiStream({ messages, context, lang, onToken, onEvent, tools, 
 
   // Multi-turn loop: the model may call tools (engine readings) before answering.
   for (let iter = 0; iter < 5; iter++) {
-    const body = { model, stream: true, max_tokens: 2048, messages: convo };
+    const body = { model, stream: true, max_tokens: 5000, messages: convo };
     if (useTools) { body.tools = tools.map((t) => t.schema); body.tool_choice = 'auto'; }
 
     const res = await fetch(`${base}/chat/completions`, {
