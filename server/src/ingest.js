@@ -22,7 +22,7 @@ async function main() {
     process.exit(1);
   }
   console.log(`Loading documents from: ${folder}`);
-  const items = documents.loadDocuments(folder);
+  const items = await documents.loadDocuments(folder);
   console.log(`Found ${items.length} chunks. Embedding via "${embeddings.PROVIDER}"…`);
   if (!items.length) { console.log('Nothing to ingest.'); return; }
 

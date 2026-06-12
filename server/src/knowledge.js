@@ -97,7 +97,7 @@ async function sync() {
       const size = o.size ?? 0;
       if (manifest[key] === size) continue; // unchanged — skip
       let text;
-      try { text = documents.extractBuffer(key, await download(c, key)); }
+      try { text = await documents.extractBuffer(key, await download(c, key)); }
       catch (e) { console.warn(`  knowledge: skip ${key}: ${e.message}`); errorFiles.push(`${key}: ${e.message}`.slice(0, 200)); continue; }
       manifest[key] = size;
       if (!text || !text.trim()) {

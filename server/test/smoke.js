@@ -122,7 +122,7 @@ async function testRag() {
 
   // Document loader handles .md and .txt (PDF path needs poppler, skipped here).
   fs.writeFileSync(path.join(vault, 'notes.txt'), 'Plain text note about the Officer star and career luck.');
-  const docs = require('../src/documents').loadDocuments(vault);
+  const docs = await require('../src/documents').loadDocuments(vault);
   const titles = docs.map((d) => d.meta.title);
   assert.ok(titles.includes('notes') && titles.includes('wealth'), `documents loader reads .txt and .md, got ${titles.join(',')}`);
 

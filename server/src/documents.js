@@ -16,7 +16,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFile } = require('child_process');
 const { chunkNote, splitFrontmatter } = require('./obsidian');
 
 const SKIP_DIRS = new Set(['.obsidian', '.trash', '.git', 'node_modules']);
@@ -42,60 +42,70 @@ function findDocs(dir, out = []) {
   return out;
 }
 
-function pdfToText(buffer, label) {
+/** Run an external tool WITHOUT blocking the event loop (async execFile), so
+ *  the server keeps serving requests while a big book is being extracted. */
+function run(cmd, args, opts = {}) {
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, timeout: 600000, ...opts },
+      (err, stdout) => (err ? reject(err) : resolve(stdout)));
+  });
+}
+
+async function pdfToText(buffer, label) {
+  const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'qms-pdf-'));
   try {
-    // Read the PDF from stdin so this works for both local files and downloads.
-    return execFileSync('pdftotext', ['-layout', '-enc', 'UTF-8', '-nopgbrk', '-', '-'],
-      { input: buffer, encoding: 'utf8', maxBuffer: 128 * 1024 * 1024 });
+    const pdf = path.join(tmp, 'doc.pdf');
+    await fs.promises.writeFile(pdf, buffer);
+    return await run('pdftotext', ['-layout', '-enc', 'UTF-8', '-nopgbrk', pdf, '-']);
   } catch (e) {
     if (e.code === 'ENOENT') {
       throw new Error('PDF support needs "pdftotext" (poppler). Install it: macOS `brew install poppler`, Debian/Ubuntu `apt-get install -y poppler-utils`.');
     }
     throw new Error(`pdftotext failed on ${label}: ${e.message}`);
+  } finally {
+    await fs.promises.rm(tmp, { recursive: true, force: true });
   }
 }
 
 /** OCR a scanned PDF: render pages to images (pdftoppm), then tesseract each.
- *  Throws with an install hint if tesseract isn't available. */
-function ocrPdf(buffer, label) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'qms-ocr-'));
+ *  Fully async — page-by-page, never blocking the server. */
+async function ocrPdf(buffer, label) {
+  const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'qms-ocr-'));
   try {
     const pdf = path.join(tmp, 'doc.pdf');
-    fs.writeFileSync(pdf, buffer);
-    execFileSync('pdftoppm', ['-png', '-gray', '-r', String(OCR_DPI), '-l', String(OCR_MAX_PAGES), pdf, path.join(tmp, 'pg')],
-      { stdio: 'ignore', timeout: 600000 });
-    const pages = fs.readdirSync(tmp).filter((f) => f.startsWith('pg') && f.endsWith('.png')).sort();
+    await fs.promises.writeFile(pdf, buffer);
+    await run('pdftoppm', ['-png', '-gray', '-r', String(OCR_DPI), '-l', String(OCR_MAX_PAGES), pdf, path.join(tmp, 'pg')]);
+    const pages = (await fs.promises.readdir(tmp)).filter((f) => f.startsWith('pg') && f.endsWith('.png')).sort();
     let out = '';
     for (const p of pages) {
       try {
-        out += execFileSync('tesseract', [path.join(tmp, p), 'stdout', '-l', OCR_LANGS, '--psm', '3'],
-          { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 120000, stdio: ['ignore', 'pipe', 'ignore'] }) + '\n';
+        out += await run('tesseract', [path.join(tmp, p), 'stdout', '-l', OCR_LANGS, '--psm', '3'], { timeout: 120000 }) + '\n';
       } catch (e) {
         if (e.code === 'ENOENT') {
           throw new Error('OCR needs "tesseract". Install it: Debian/Ubuntu `apt-get install -y tesseract-ocr tesseract-ocr-chi-sim tesseract-ocr-chi-tra`, macOS `brew install tesseract tesseract-lang`.');
         }
-        console.warn(`  OCR: page ${p} of ${label} failed (${e.message.slice(0, 80)}) — continuing`);
+        console.warn(`  OCR: page ${p} of ${label} failed (${String(e.message).slice(0, 80)}) — continuing`);
       }
     }
     return out;
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
+    await fs.promises.rm(tmp, { recursive: true, force: true });
   }
 }
 
 /** Extract plain text from an in-memory file (used for bucket downloads). */
-function extractBuffer(filename, buffer) {
+async function extractBuffer(filename, buffer) {
   const ext = path.extname(filename).toLowerCase();
   if (ext === '.md') return splitFrontmatter(buffer.toString('utf8')).body;
   if (ext === '.txt') return buffer.toString('utf8');
   if (ext === '.pdf') {
     const label = path.basename(filename);
-    const text = pdfToText(buffer, label);
+    const text = await pdfToText(buffer, label);
     if (text && text.replace(/\s+/g, '').length >= TEXT_LAYER_MIN_CHARS) return text;
     // Little or no text layer — likely a scanned/image PDF. Try OCR.
     try {
       console.warn(`  "${label}" has no usable text layer — running OCR (${OCR_LANGS})…`);
-      const ocr = ocrPdf(buffer, label);
+      const ocr = await ocrPdf(buffer, label);
       if (ocr && ocr.trim()) return ocr;
     } catch (e) {
       console.warn(`  OCR unavailable/failed for ${label}: ${e.message}`);
@@ -105,21 +115,21 @@ function extractBuffer(filename, buffer) {
   return '';
 }
 
-function extractText(file) {
-  return extractBuffer(file, fs.readFileSync(file));
+async function extractText(file) {
+  return extractBuffer(file, await fs.promises.readFile(file));
 }
 
 /**
  * Load and chunk every supported document under a folder.
  * Returns [{ id, text, meta: { title, path, heading } }].
  */
-function loadDocuments(dir, opts = {}) {
+async function loadDocuments(dir, opts = {}) {
   const root = path.resolve(dir);
   if (!fs.existsSync(root)) throw new Error(`Folder not found: ${root}`);
   const items = [];
   for (const file of findDocs(root)) {
     let body;
-    try { body = extractText(file); }
+    try { body = await extractText(file); }
     catch (e) { console.warn(`  skip ${path.relative(root, file)}: ${e.message}`); continue; }
     if (!body || !body.trim()) continue;
     const rel = path.relative(root, file);
