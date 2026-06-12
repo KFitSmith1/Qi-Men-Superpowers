@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "astrology-basic": {
+      "type": "http",
+      "url": "https://astrology-basic.mcpize.run"
+    },
+    "astrology-astrocartography": {
+      "type": "http",
+      "url": "https://astrology-astrocartography.mcpize.run"
+    }
+  }
+}
