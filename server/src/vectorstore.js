@@ -268,6 +268,7 @@ async function docs() {
     const key = x.meta?.path || x.meta?.title || x.id;
     const e = map.get(key) || { path: key, title: x.meta?.title || key, chunks: 0 };
     e.chunks++;
+    if (x.meta?.size) e.size = x.meta.size; // source file size — used for manifest recovery
     map.set(key, e);
   }
   return [...map.values()].sort((a, b) => b.chunks - a.chunks);

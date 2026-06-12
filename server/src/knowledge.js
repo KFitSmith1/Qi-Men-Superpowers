@@ -45,13 +45,29 @@ function status() {
 const headers = (c) => ({ 'x-api-key': c.key });
 const objUrl = (c, key) => `${c.base}/api/storage/buckets/${encodeURIComponent(c.bucket)}/objects/${encodeURIComponent(key)}`;
 
+/** fetch with retry on transient failures; `opts` may be a factory so request
+ *  bodies (FormData) are rebuilt per attempt. */
+async function req(url, opts, tries = 4) {
+  let delay = 400;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fetch(url, typeof opts === 'function' ? opts() : opts);
+      if ((res.status === 429 || res.status >= 500) && i < tries - 1) { await new Promise((r) => setTimeout(r, delay)); delay *= 2.5; continue; }
+      return res;
+    } catch (e) {
+      if (i === tries - 1) throw e;
+      await new Promise((r) => setTimeout(r, delay)); delay *= 2.5;
+    }
+  }
+}
+
 async function listObjects(c) {
   const out = [];
   let offset = 0;
   for (;;) {
     const url = `${c.base}/api/storage/buckets/${encodeURIComponent(c.bucket)}/objects?limit=1000&offset=${offset}`
       + (c.prefix ? `&prefix=${encodeURIComponent(c.prefix)}` : '');
-    const res = await fetch(url, { headers: headers(c) });
+    const res = await req(url, { headers: headers(c) });
     if (!res.ok) throw new Error(`list objects HTTP ${res.status}`);
     const body = await res.json();
     const data = body.data || body.objects || [];
@@ -63,19 +79,26 @@ async function listObjects(c) {
 }
 
 async function getManifest(c) {
-  const res = await fetch(objUrl(c, c.manifestKey), { headers: headers(c) });
-  if (!res.ok) return {};
+  const res = await req(objUrl(c, c.manifestKey), { headers: headers(c) });
+  if (!res.ok) {
+    if (res.status !== 404) console.warn(`  knowledge: manifest fetch HTTP ${res.status} — will recover from the index`);
+    return {};
+  }
   try { return JSON.parse(await res.text()); } catch { return {}; }
 }
 
 async function putManifest(c, manifest) {
-  const fd = new FormData();
-  fd.append('file', new Blob([JSON.stringify(manifest)], { type: 'application/json' }), c.manifestKey);
-  await fetch(objUrl(c, c.manifestKey), { method: 'PUT', headers: headers(c), body: fd });
+  const opts = () => {
+    const fd = new FormData();
+    fd.append('file', new Blob([JSON.stringify(manifest)], { type: 'application/json' }), c.manifestKey);
+    return { method: 'PUT', headers: headers(c), body: fd };
+  };
+  const res = await req(objUrl(c, c.manifestKey), opts);
+  if (!res.ok) console.error(`  knowledge: MANIFEST SAVE FAILED (HTTP ${res.status}) — finished files may be re-processed after a restart`);
 }
 
 async function download(c, key) {
-  const res = await fetch(objUrl(c, key), { headers: headers(c) });
+  const res = await req(objUrl(c, key), { headers: headers(c) });
   if (!res.ok) throw new Error(`download HTTP ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
 }
@@ -96,6 +119,23 @@ async function sync() {
     const c = cfg();
     const objects = (await listObjects(c)).filter((o) => /\.(md|txt|pdf)$/i.test(o.key || ''));
     const manifest = await getManifest(c);
+
+    // Self-healing: every stored chunk records its source file's size, so a
+    // lost/stale manifest can be rebuilt from the vector index — a file whose
+    // chunks are already indexed at the current size is never re-processed.
+    let recovered = 0;
+    try {
+      const sizeByPath = new Map((await store.docs()).filter((d) => d.size).map((d) => [d.path, d.size]));
+      for (const o of objects) {
+        const size = o.size ?? 0;
+        if (manifest[o.key] !== size && sizeByPath.get(o.key) === size) { manifest[o.key] = size; recovered++; }
+      }
+    } catch { /* index unavailable — proceed with the manifest as-is */ }
+    if (recovered) {
+      console.log(`  knowledge: recovered ${recovered} manifest entr${recovered === 1 ? 'y' : 'ies'} from the index`);
+      await putManifest(c, manifest);
+    }
+
     const changed = objects.filter((o) => manifest[o.key] !== (o.size ?? 0));
     running.total = changed.length;
 
