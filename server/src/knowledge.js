@@ -115,21 +115,29 @@ async function sync() {
         running.done++;
         continue;
       }
-      manifest[key] = size;
       if (!text || !text.trim()) {
         console.warn(`  knowledge: "${key}" has no extractable text (even after OCR) — skipped`);
         noTextFiles.push(key);
+        manifest[key] = size;
       } else {
-        const title = key.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
-        const records = [];
-        chunkNote(text).forEach((ch, i) => records.push({
-          id: `bucket:${key}#${i}`, text: ch.text, meta: { title, path: key, heading: ch.heading || '', size },
-        }));
-        const vecs = await embeddings.embed(records.map((r) => r.text));
-        await store.upsert(records.map((r, i) => ({ id: r.id, vector: vecs[i], text: r.text, meta: r.meta })));
-        newChunks += records.length;
-        changedFiles++;
-        console.log(`  knowledge: indexed "${key}" (${records.length} chunks)`);
+        // Embed/store failures must not abort the whole sync — record the file
+        // and move on (its manifest entry stays unset, so it's retried later).
+        try {
+          const title = key.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
+          const records = [];
+          chunkNote(text).forEach((ch, i) => records.push({
+            id: `bucket:${key}#${i}`, text: ch.text, meta: { title, path: key, heading: ch.heading || '', size },
+          }));
+          const vecs = await embeddings.embed(records.map((r) => r.text));
+          await store.upsert(records.map((r, i) => ({ id: r.id, vector: vecs[i], text: r.text, meta: r.meta })));
+          newChunks += records.length;
+          changedFiles++;
+          manifest[key] = size;
+          console.log(`  knowledge: indexed "${key}" (${records.length} chunks)`);
+        } catch (e) {
+          console.warn(`  knowledge: failed to index ${key}: ${e.message}`);
+          errorFiles.push(`${key}: ${e.message}`.slice(0, 200));
+        }
       }
       // Checkpoint after every file so a restart never repeats finished work.
       await putManifest(c, manifest);

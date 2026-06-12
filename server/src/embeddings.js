@@ -46,10 +46,21 @@ async function openaiEmbed(texts) {
   const key = process.env.EMBEDDINGS_API_KEY || process.env.OPENAI_API_KEY;
   const model = process.env.EMBEDDINGS_MODEL || 'text-embedding-3-small';
   if (!key) return texts.map(hashEmbed);
+  // Safety: the model rejects inputs over 8192 tokens. Normal chunks are
+  // ~1400 chars; anything bigger is pathological — truncate rather than fail
+  // (6000 chars stays under the limit even for all-CJK text at ~1 token/char).
+  const MAX_EMBED_CHARS = Number(process.env.MAX_EMBED_CHARS || 6000);
+  const safeTexts = texts.map((t) => {
+    const s = String(t);
+    if (s.length <= MAX_EMBED_CHARS) return s;
+    console.warn(`  embeddings: truncating oversized input (${s.length} chars) to ${MAX_EMBED_CHARS}`);
+    return s.slice(0, MAX_EMBED_CHARS);
+  });
+
   const out = [];
   // Batch to keep request sizes sane.
-  for (let i = 0; i < texts.length; i += 96) {
-    const batch = texts.slice(i, i + 96);
+  for (let i = 0; i < safeTexts.length; i += 96) {
+    const batch = safeTexts.slice(i, i + 96);
     let res, delay = 500;
     for (let attempt = 0; attempt < 4; attempt++) {       // retry transient failures
       try {

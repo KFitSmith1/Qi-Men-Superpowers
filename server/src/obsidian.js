@@ -61,8 +61,29 @@ function toPlainText(md) {
  * Split text into ~maxChars chunks on paragraph boundaries, with overlap.
  * Heading lines are tracked so each chunk records the section it came from.
  */
+/** Split a single oversized block (no paragraph breaks — OCR output,
+ *  transcripts) into <= maxChars pieces, preferring sentence boundaries.
+ *  Without this, one wall of text becomes one giant chunk that blows the
+ *  embedding model's per-input token limit. */
+function splitLongBlock(block, maxChars) {
+  if (block.length <= maxChars) return [block];
+  const out = [];
+  let rest = block;
+  while (rest.length > maxChars) {
+    const window = rest.slice(0, maxChars);
+    // cut at the last sentence end / line break inside the window
+    const m = window.match(/^[\s\S]*[。．.!?！?？;；\n]/);
+    let cut = m ? m[0].length : -1;
+    if (cut < maxChars * 0.5) cut = maxChars; // no usable boundary — hard cut
+    out.push(rest.slice(0, cut));
+    rest = rest.slice(cut);
+  }
+  if (rest.trim()) out.push(rest);
+  return out;
+}
+
 function chunkNote(body, { maxChars = 1400, overlap = 200 } = {}) {
-  const blocks = body.split(/\n{2,}/);
+  const blocks = body.split(/\n{2,}/).flatMap((b) => splitLongBlock(b, maxChars));
   const chunks = [];
   let buf = '';
   let heading = '';
