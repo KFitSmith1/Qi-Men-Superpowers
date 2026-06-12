@@ -1,7 +1,11 @@
 {
   "sandbox": {
     "network": {
-      "allowedDomains": ["here.now"]
+      "allowedDomains": [
+        "here.now",
+        "astrology-basic.mcpize.run",
+        "astrology-astrocartography.mcpize.run"
+      ]
     }
   }
 }
