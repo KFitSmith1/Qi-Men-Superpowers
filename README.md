@@ -146,8 +146,13 @@ reply). Event-based tools are offered only when the event time is available.
 
 `ingest` reads every `.md`, `.txt`, and `.pdf` under a folder, chunks and embeds
 them, and uploads the index to the vector store. PDF text is extracted with
-`pdftotext` (poppler) — preinstalled in the Docker image; for local runs install
-it (`brew install poppler` / `apt-get install -y poppler-utils`).
+`pdftotext` (poppler); **scanned/image-only PDFs automatically fall back to
+OCR** (`pdftoppm` + `tesseract`, English + Simplified/Traditional Chinese —
+tune with `OCR_LANGS`/`OCR_DPI`/`OCR_MAX_PAGES`). Both are preinstalled in the
+Docker image; for local runs: `brew install poppler tesseract tesseract-lang` /
+`apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-chi-sim
+tesseract-ocr-chi-tra`. OCR reads printed text in images; it cannot interpret
+diagrams or charts.
 
 ```bash
 cd server

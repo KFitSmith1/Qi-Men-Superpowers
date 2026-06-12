@@ -25,7 +25,9 @@ function cfg() {
   const key = process.env.INSFORGE_API_KEY || '';
   const bucket = process.env.INSFORGE_DOCS_BUCKET || process.env.INSFORGE_BUCKET || '';
   const prefix = process.env.INSFORGE_DOCS_PREFIX || '';
-  const manifestKey = process.env.INSFORGE_MANIFEST_OBJECT || 'qms_docs_manifest.json';
+  // v2: OCR support added — a fresh manifest forces one re-scan of every file
+  // so scanned PDFs that were previously skipped as "no text" get OCR'd.
+  const manifestKey = process.env.INSFORGE_MANIFEST_OBJECT || 'qms_docs_manifest_v2.json';
   return { base, key, bucket, prefix, manifestKey };
 }
 

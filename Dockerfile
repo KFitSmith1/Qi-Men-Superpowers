@@ -9,8 +9,10 @@ ENV LANG=C.UTF-8 \
 
 WORKDIR /app
 
-# poppler-utils provides `pdftotext` for PDF ingestion into the knowledge base.
-RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils \
+# poppler-utils provides `pdftotext`/`pdftoppm` for PDF ingestion; tesseract
+# (with English + Chinese packs) OCRs scanned/image-only PDFs as a fallback.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      poppler-utils tesseract-ocr tesseract-ocr-chi-sim tesseract-ocr-chi-tra \
     && rm -rf /var/lib/apt/lists/*
 
 COPY engine/ engine/
