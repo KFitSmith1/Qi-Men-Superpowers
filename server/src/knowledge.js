@@ -39,7 +39,7 @@ let lastError = null;  // { at, message }
 
 function status() {
   const c = cfg();
-  return { enabled: enabled(), bucket: enabled() ? c.bucket : null, lastSync, lastError };
+  return { enabled: enabled(), bucket: enabled() ? c.bucket : null, syncing: running, lastSync, lastError };
 }
 
 const headers = (c) => ({ 'x-api-key': c.key });
@@ -80,47 +80,64 @@ async function download(c, key) {
   return Buffer.from(await res.arrayBuffer());
 }
 
-/** Scan the bucket and ingest new/changed documents. */
+/** Live progress of an in-flight sync (null when idle). */
+let running = null; // { startedAt, current, done, total }
+
+/** Scan the bucket and ingest new/changed documents.
+ *  Incremental: each file is embedded, stored, and checkpointed in the manifest
+ *  as soon as it finishes — progress survives restarts and documents become
+ *  searchable one by one. A mutex prevents overlapping runs (boot + timer +
+ *  manual endpoint). */
 async function sync() {
   if (!enabled()) return { enabled: false };
+  if (running) return { enabled: true, alreadyRunning: true, progress: running };
+  running = { startedAt: new Date().toISOString(), current: null, done: 0, total: 0 };
   try {
     const c = cfg();
     const objects = (await listObjects(c)).filter((o) => /\.(md|txt|pdf)$/i.test(o.key || ''));
     const manifest = await getManifest(c);
+    const changed = objects.filter((o) => manifest[o.key] !== (o.size ?? 0));
+    running.total = changed.length;
 
-    const records = [];
     let changedFiles = 0;
-    const noTextFiles = [];   // present in the bucket but no extractable text (scans/image-only PDFs)
+    let newChunks = 0;
+    const noTextFiles = [];   // present in the bucket but no extractable text even after OCR
     const errorFiles = [];    // download/extraction failed (will be retried next sync)
-    for (const o of objects) {
+    for (const o of changed) {
       const key = o.key;
       const size = o.size ?? 0;
-      if (manifest[key] === size) continue; // unchanged — skip
+      running.current = key;
       let text;
       try { text = await documents.extractBuffer(key, await download(c, key)); }
-      catch (e) { console.warn(`  knowledge: skip ${key}: ${e.message}`); errorFiles.push(`${key}: ${e.message}`.slice(0, 200)); continue; }
-      manifest[key] = size;
-      if (!text || !text.trim()) {
-        console.warn(`  knowledge: "${key}" has no extractable text (scanned/image-only PDF?) — skipped`);
-        noTextFiles.push(key);
+      catch (e) {
+        console.warn(`  knowledge: skip ${key}: ${e.message}`);
+        errorFiles.push(`${key}: ${e.message}`.slice(0, 200));
+        running.done++;
         continue;
       }
-      const title = key.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
-      chunkNote(text).forEach((ch, i) => records.push({
-        id: `bucket:${key}#${i}`, text: ch.text, meta: { title, path: key, heading: ch.heading || '', size },
-      }));
-      changedFiles++;
-    }
-
-    if (records.length || noTextFiles.length) {
-      if (records.length) {
+      manifest[key] = size;
+      if (!text || !text.trim()) {
+        console.warn(`  knowledge: "${key}" has no extractable text (even after OCR) — skipped`);
+        noTextFiles.push(key);
+      } else {
+        const title = key.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
+        const records = [];
+        chunkNote(text).forEach((ch, i) => records.push({
+          id: `bucket:${key}#${i}`, text: ch.text, meta: { title, path: key, heading: ch.heading || '', size },
+        }));
         const vecs = await embeddings.embed(records.map((r) => r.text));
         await store.upsert(records.map((r, i) => ({ id: r.id, vector: vecs[i], text: r.text, meta: r.meta })));
+        newChunks += records.length;
+        changedFiles++;
+        console.log(`  knowledge: indexed "${key}" (${records.length} chunks)`);
       }
+      // Checkpoint after every file so a restart never repeats finished work.
       await putManifest(c, manifest);
+      running.done++;
     }
+
     const summary = {
-      enabled: true, files: objects.length, changedFiles, newChunks: records.length,
+      enabled: true, files: objects.length, changedFiles, newChunks,
       totalChunks: await store.count(),
       ...(noTextFiles.length ? { noTextFiles: noTextFiles.slice(0, 20) } : {}),
       ...(errorFiles.length ? { errorFiles: errorFiles.slice(0, 20) } : {}),
@@ -131,6 +148,8 @@ async function sync() {
   } catch (e) {
     lastError = { at: new Date().toISOString(), message: e.message };
     throw e;
+  } finally {
+    running = null;
   }
 }
 
