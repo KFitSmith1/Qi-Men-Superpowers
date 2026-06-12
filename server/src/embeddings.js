@@ -62,6 +62,8 @@ async function openaiEmbed(texts) {
   for (let i = 0; i < safeTexts.length; i += 96) {
     const batch = safeTexts.slice(i, i + 96);
     let res, delay = 500;
+    // Token-per-minute rate limits (429) need patient waits, not quick retries.
+    const rateLimitFloor = Number(process.env.EMBED_429_DELAY_MS || 20000);
     for (let attempt = 0; attempt < 4; attempt++) {       // retry transient failures
       try {
         res = await fetch(`${base}/embeddings`, {
@@ -69,7 +71,10 @@ async function openaiEmbed(texts) {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
           body: JSON.stringify({ model, input: batch }),
         });
-        if ((res.status === 429 || res.status >= 500) && attempt < 3) { await new Promise((r) => setTimeout(r, delay)); delay *= 2.5; continue; }
+        if ((res.status === 429 || res.status >= 500) && attempt < 3) {
+          if (res.status === 429) delay = Math.max(delay, rateLimitFloor);
+          await new Promise((r) => setTimeout(r, delay)); delay *= 2.5; continue;
+        }
         break;
       } catch (e) {
         if (attempt < 3) { await new Promise((r) => setTimeout(r, delay)); delay *= 2.5; continue; }

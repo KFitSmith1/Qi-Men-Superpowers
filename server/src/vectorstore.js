@@ -237,9 +237,16 @@ async function ensureLoaded() {
   return cache;
 }
 
-async function upsert(items) {
+async function upsert(items, opts = {}) {
   const all = await ensureLoaded();
-  const byId = new Map(all.map((x) => [x.id, x]));
+  let base = all;
+  // Re-indexing a document: drop its previous chunks first so a shorter
+  // re-chunking can't leave stale high-numbered leftovers behind.
+  if (opts.replacePaths?.length) {
+    const rp = new Set(opts.replacePaths);
+    base = all.filter((x) => !(String(x.id).startsWith('bucket:') && rp.has(x.meta?.path)));
+  }
+  const byId = new Map(base.map((x) => [x.id, x]));
   for (const it of items) {
     // Quantize incoming float vectors to int8 (idempotent for Int8Array input).
     const vector = it.vector instanceof Int8Array ? it.vector : quantize(it.vector || []);
@@ -248,6 +255,18 @@ async function upsert(items) {
   cache = [...byId.values()];
   await adapter.save(cache);
   return cache.length;
+}
+
+/** Remove records that fail the predicate; returns how many were removed. */
+async function prune(keepFn) {
+  const all = await ensureLoaded();
+  const kept = all.filter(keepFn);
+  const removed = all.length - kept.length;
+  if (removed) {
+    cache = kept;
+    await adapter.save(cache);
+  }
+  return removed;
 }
 
 async function search(q, k = 6) {
@@ -274,4 +293,4 @@ async function docs() {
   return [...map.values()].sort((a, b) => b.chunks - a.chunks);
 }
 
-module.exports = { upsert, search, count, docs, BACKEND, cosine };
+module.exports = { upsert, search, count, docs, prune, BACKEND, cosine };

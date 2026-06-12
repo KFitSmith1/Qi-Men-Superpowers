@@ -169,7 +169,9 @@ async function sync() {
             id: `bucket:${key}#${i}`, text: ch.text, meta: { title, path: key, heading: ch.heading || '', size },
           }));
           const vecs = await embeddings.embed(records.map((r) => r.text));
-          await store.upsert(records.map((r, i) => ({ id: r.id, vector: vecs[i], text: r.text, meta: r.meta })));
+          // replacePaths drops the file's previous chunks so re-chunking never
+          // leaves stale leftovers from a longer earlier version.
+          await store.upsert(records.map((r, i) => ({ id: r.id, vector: vecs[i], text: r.text, meta: r.meta })), { replacePaths: [key] });
           newChunks += records.length;
           changedFiles++;
           manifest[key] = size;
@@ -184,9 +186,26 @@ async function sync() {
       running.done++;
     }
 
+    // Prune chunks whose source file was deleted from the bucket (only
+    // bucket-sourced ids — vault docs ingested via the CLI are untouched).
+    let prunedChunks = 0;
+    try {
+      const present = new Set(objects.map((o) => o.key));
+      prunedChunks = await store.prune((x) => !String(x.id).startsWith('bucket:') || present.has(x.meta?.path));
+      if (prunedChunks) {
+        console.log(`  knowledge: pruned ${prunedChunks} chunks from files no longer in the bucket`);
+        // Drop their manifest entries too so a re-upload is treated as new.
+        for (const k of Object.keys(manifest)) if (!present.has(k)) delete manifest[k];
+        await putManifest(c, manifest);
+      }
+    } catch (e) {
+      console.warn(`  knowledge: prune failed: ${e.message}`);
+    }
+
     const summary = {
       enabled: true, files: objects.length, changedFiles, newChunks,
       totalChunks: await store.count(),
+      ...(prunedChunks ? { prunedChunks } : {}),
       ...(noTextFiles.length ? { noTextFiles: noTextFiles.slice(0, 20) } : {}),
       ...(errorFiles.length ? { errorFiles: errorFiles.slice(0, 20) } : {}),
     };
