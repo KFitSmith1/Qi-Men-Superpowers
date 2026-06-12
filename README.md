@@ -44,6 +44,16 @@ calendar math, and renders everything in a bilingual (中文 / English) web UI.
 | 化气阵 Array | `qimen_huaqizhen.sh` | Per-palace array-placement plans to suppress harmful energies |
 | 移神换将 Remedy | `qimen_yishenhuanjiang.sh` | Transformation remedies: removal, combination, drainage, clash |
 
+**问答 Ask — conversational interpreter** (optional)
+- Streaming chat that answers BaZi/Qi Men questions, grounded in your most
+  recently computed reading and an optional knowledge base
+- Free in-browser **voice**: speak questions (Web Speech `SpeechRecognition`)
+  and have replies read aloud (`speechSynthesis`), following the 中文/EN toggle
+- **Pluggable, non-Anthropic providers** chosen by env vars — works offline out
+  of the box (no keys) and scales up to OpenAI + a hosted knowledge base
+- **RAG** over an [Obsidian](https://obsidian.md) vault: notes are chunked,
+  embedded, and retrieved per question; the source notes used are shown as tags
+
 ## Quick start
 
 Requires **Node.js ≥ 18** and **Bash** (the engine has zero other dependencies — no npm install needed).
@@ -71,6 +81,7 @@ and export it before starting (or let docker-compose pass it through).
 | `POST /api/qimen/plate` | `{ datetime, type: "birth"\|"event", tianqin?, longitude?, tzOffset? }` | full plate JSON + `plateId` |
 | `POST /api/qimen/analyze` | `{ module, birth?, eventTime?, question?, topic?, yixiang?, familyStems?, tianqin?, longitude?, tzOffset? }` | `{ text, data, birthPlate?, eventPlate?, plateId }` |
 | `POST /api/qimen/wanwu` | `{ plateId, palace }` or `{ stem?/star?/gate?/deity?/state? }` | correspondence text + JSON |
+| `POST /api/chat` | `{ messages:[{role,content}], context?, lang? }` | **SSE stream** of `{type:"token"\|"sources"\|"done"\|"error", …}` |
 
 When `longitude` is supplied, datetimes are corrected to true solar time before
 plate setting and the correction is echoed back (`solarCorrection`).
@@ -78,16 +89,120 @@ plate setting and the correction is echoed back (`solarCorrection`).
 Deterministic computations (plates, module runs, BaZi) are cached in memory
 for 10 minutes; cached plates power the palace-click Wan Wu lookups.
 
+## Conversational interpreter (问答 Ask)
+
+The **Ask** tab is optional and degrades gracefully: with no configuration it
+runs a `stub` provider (an offline canned stream) so the UI, streaming, and
+voice all work without any keys. Three independent pieces are each chosen by an
+environment variable.
+
+**1 · Language model** — `LLM_PROVIDER`
+- `stub` (default) — offline, no keys
+- `openai` — any OpenAI-compatible `/chat/completions` gateway. Set
+  `OPENAI_API_KEY`, optional `OPENAI_BASE_URL` (default `https://api.openai.com/v1`)
+  and `OPENAI_MODEL` (default `gpt-4o-mini`).
+
+**1b · Multi-model via OpenRouter** — point `OPENAI_BASE_URL` at
+`https://openrouter.ai/api/v1` with an OpenRouter key and the chat gains a
+**model picker** (⚡ Auto / Fast / 🧠 Reasoning / Expert / ✍️ Writing) plus
+per-question **auto-routing** (analysis → reasoning, code → expert,
+drafting → writing). Tier defaults: `openrouter/auto`, `deepseek/deepseek-r1`,
+`moonshotai/kimi-k2`, `openai/gpt-4o` — each overridable via
+`MODEL_DEFAULT/REASONING/PREMIUM/WRITING/TRANSLATE` (slugs:
+openrouter.ai/models). Reasoning models stream their chain-of-thought live and
+it collapses into a "🧠 Reasoning" disclosure above the answer; engine tools are
+withheld from R1-style tiers (`MODEL_NO_TOOLS`, default `reasoning`) since
+their function calling is unreliable. Non-OpenRouter setups are unaffected —
+every tier falls back to `OPENAI_MODEL`.
+
+**2 · Embeddings** — `EMBEDDINGS_PROVIDER`
+- `hash` — offline deterministic vectorizer (no keys; used for tests/fallback)
+- `openai` (default when `OPENAI_API_KEY` is set) — `text-embedding-3-small`
+
+**3 · Vector store** — `VECTOR_STORE`
+- `local` (default) — the index is a JSON file (`VECTOR_FILE`, gitignored);
+  in-process cosine search
+- `insforge` — the index is persisted as one JSON blob in an
+  [InsForge](https://insforge.dev) storage bucket and loaded on boot (durable
+  across the ephemeral deploy container); cosine search runs in-process, which
+  is ideal for a personal vault's scale. Set `INSFORGE_BASE_URL` (your project
+  URL), `INSFORGE_API_KEY` (sent as `x-api-key`), `INSFORGE_BUCKET`, and optional
+  `INSFORGE_OBJECT` (default `qms_vectors.json`).
+
+Retrieval is automatic: `/api/chat` embeds the latest question, pulls the top
+matching chunks, injects them as grounding context, and streams a `sources`
+event listing the notes used. The system prompt forbids inventing chart
+calculations, so answers stay anchored to the computed reading and the corpus.
+
+When birth details are present, the backend also computes the BaZi chart (four
+pillars, strength, luck pillars, current-year pillar) and injects it every turn,
+and the model can **call the Qi Men reading modules as tools** — 财官 wealth /
+婚恋 romance / 性格 personality / 移神换将 remedy / 化气阵 array / 寻时 timing — plus,
+when an event date/time is set, 问事 event / 占断 divination / 遥测 sensing — to
+pull a full analysis mid-conversation (consulted modules appear as tags in the
+reply). Event-based tools are offered only when the event time is available.
+
+### Building the knowledge base (Obsidian vault, text, or PDFs)
+
+`ingest` reads every `.md`, `.txt`, and `.pdf` under a folder, chunks and embeds
+them, and uploads the index to the vector store. PDF text is extracted with
+`pdftotext` (poppler); **scanned/image-only PDFs automatically fall back to
+OCR** (`pdftoppm` + `tesseract`, English + Simplified/Traditional Chinese —
+tune with `OCR_LANGS`/`OCR_DPI`/`OCR_MAX_PAGES`). Both are preinstalled in the
+Docker image; for local runs: `brew install poppler tesseract tesseract-lang` /
+`apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-chi-sim
+tesseract-ocr-chi-tra`. OCR reads printed text in images; it cannot interpret
+diagrams or charts.
+
+```bash
+cd server
+npm run insforge:check                 # validate InsForge creds + bucket (if used)
+npm run ingest -- /path/to/your/vault  # or any folder of .md / .txt / .pdf files
+```
+
+Re-running merges by file path, so you can ingest a vault and a separate PDFs
+folder and they accumulate. After ingesting, restart the server so it reloads
+the index.
+
+### Auto-ingest: drop files into the InsForge bucket
+
+Instead of running the CLI, you can upload `.pdf` / `.txt` / `.md` files straight
+to your InsForge storage bucket (dashboard or API). The server scans the bucket,
+extracts + embeds **new or changed** files (tracked by size in a small manifest,
+so nothing is re-embedded needlessly), and merges them into the index:
+
+- **On boot** automatically (when a bucket is configured; disable with
+  `KNOWLEDGE_SYNC_ON_BOOT=false`).
+- **On a timer** with `KNOWLEDGE_SYNC_MINUTES=N`.
+- **On demand** via `POST /api/knowledge/sync` — guarded by `ADMIN_TOKEN`
+  (the endpoint is disabled unless that env var is set):
+  ```bash
+  curl -X POST https://<your-domain>/api/knowledge/sync -H "x-admin-token: $ADMIN_TOKEN"
+  ```
+
+Set `INSFORGE_DOCS_BUCKET` (defaults to `INSFORGE_BUCKET`) and, optionally,
+`INSFORGE_DOCS_PREFIX` to limit the scan to a sub-folder. The vector-index and
+manifest blobs (`.json`) are ignored by the scan. Uploading raw files alone does
+**not** affect retrieval until a sync embeds them.
+
+`GET /api/health` reports the live chat config and the loaded chunk count under
+`chat`. See `.env.example` for the full list of variables.
+
 ## Architecture
 
 ```
 web/        static bilingual frontend (no build step) — nine-palace grid,
             BaZi pillars, five-element bars, luck-pillar timeline, module tabs
 server/     zero-dependency Node HTTP server
-  src/index.js   routes, static serving, response cache
+  src/index.js   routes, static serving, response cache, /api/chat SSE
   src/qimen.js   engine wrapper — per-request temp dirs around the bash CLIs
   src/bazi.js    Ten Gods / hidden stems / five elements / strength / luck pillars
   src/solar.js   true solar time + Jie 节 solar-term approximation (±1 day)
+  src/llm.js          chat provider adapter (stub | openai-compatible)
+  src/embeddings.js   embeddings adapter (hash | openai)
+  src/vectorstore.js  vector index + cosine search (local | insforge storage)
+  src/obsidian.js     Obsidian vault loader + chunker
+  src/ingest.js       CLI: vault -> chunk -> embed -> upsert
 engine/     vendored qmenpowers (GPL-3.0) — pure-Bash plate engine + modules
 ```
 

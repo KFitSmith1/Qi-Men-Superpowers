@@ -23,10 +23,19 @@ const path = require('path');
 
 const qimen = require('./qimen');
 const bazi = require('./bazi');
+const llm = require('./llm');
+const embeddings = require('./embeddings');
+const vectorstore = require('./vectorstore');
+const knowledge = require('./knowledge');
 const { trueSolarTime } = require('./solar');
 
 const PORT = Number(process.env.PORT || 8787);
 const WEB_ROOT = path.resolve(__dirname, '..', '..', 'web');
+
+// When the frontend is hosted on a different origin (e.g. static web/ published
+// to here.now while this server runs elsewhere), set CORS_ALLOW_ORIGIN to that
+// origin, e.g. "https://woody-rosette-bekc.here.now". Defaults to "*".
+const CORS_ORIGIN = process.env.CORS_ALLOW_ORIGIN || '*';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -61,7 +70,10 @@ function cacheSet(key, value) {
 
 function sendJson(res, status, body) {
   const data = JSON.stringify(body);
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': CORS_ORIGIN,
+  });
   res.end(data);
 }
 
@@ -136,12 +148,25 @@ const routes = {
 
   'POST /api/qimen/wanwu': (body) => qimen.runWanwu(body),
 
+  // Knowledge-base inventory: which documents are actually searchable.
+  'GET /api/knowledge/docs': async () => ({
+    docs: await vectorstore.docs(),
+    autoIngest: knowledge.status(),
+  }),
+
   'GET /api/health': async () => ({
     ok: true,
     engine: 'qmenpowers (pure Bash, Zhi-Run, rotating plate)',
     modules: qimen.MODULES,
     eventQuestions: qimen.EVENT_QUESTIONS,
     astrologyApiConfigured: Boolean(process.env.ASTROLOGY_API_KEY),
+    chat: {
+      llmProvider: llm.PROVIDER,
+      embeddings: embeddings.PROVIDER,
+      vectorStore: vectorstore.BACKEND,
+      knowledgeChunks: await vectorstore.count().catch(() => null),
+      autoIngest: knowledge.status(),
+    },
   }),
 };
 
@@ -160,13 +185,220 @@ function serveStatic(req, res) {
       res.end('Not found');
       return;
     }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
+      // Always revalidate so a redeploy's HTML/JS/CSS shows up without a hard refresh.
+      'Cache-Control': 'no-cache, must-revalidate',
+    });
     res.end(data);
   });
 }
 
+/** Qi Men reading modules exposed to the chat model as callable tools.
+ *  `needs` gates availability on what the request context provides (birth and/or
+ *  an event time); `params` declares extra arguments the model must supply. */
+const CHAT_TOOLS = {
+  wealth_career_reading: { module: 'caiguan', needs: ['birth'], desc: 'Qi Men wealth & career reading (财官): seven wealth hazards, six-harm detection, monthly-decree relations, and industry symbols.' },
+  romance_reading: { module: 'hunlian', needs: ['birth'], desc: 'Qi Men romance & relationship reading (婚恋): partner combinations, peach-blossom, lonely-star patterns.' },
+  personality_reading: { module: 'xingge', needs: ['birth'], desc: 'Qi Men personality reading (性格) from the day & hour stem palaces.' },
+  remedy_reading: { module: 'yishenhuanjiang', needs: ['birth'], desc: 'Transformation remedy (移神换将): removal, combination, drainage, and clash fixes for harmful patterns.' },
+  array_placement: { module: 'huaqizhen', needs: ['birth'], desc: 'Array placement plan (化气阵): per-palace placements to suppress harmful energies.' },
+  time_selection: { module: 'xunshijieyun', needs: ['birth'], desc: 'Auspicious timing (寻时借运): ranks 60 gan-zhi variant plates by six-harm count to find the best time windows.' },
+  event_reading: { module: 'event', needs: ['event'], params: ['question'], desc: 'Reading for a specific question about an event/situation (问事), using the event-time plate.' },
+  divination_reading: { module: 'zhanduan', needs: ['birth', 'event'], params: ['topic'], desc: 'Classical Qi Men divination judgment (占断) for the event, evaluated against ancient rule sets.' },
+  cross_plate_sensing: { module: 'yaoce', needs: ['birth', 'event'], desc: 'Cross-plate sensing (遥测): birth-plate protected stems placed on the event plate.' },
+};
+
+function toolSchema(name, info) {
+  const properties = {};
+  const required = [];
+  if (info.params?.includes('question')) {
+    properties.question = { type: 'string', enum: qimen.EVENT_QUESTIONS, description: 'Question category (Chinese), best matching the user\'s question.' };
+    required.push('question');
+  }
+  if (info.params?.includes('topic')) {
+    properties.topic = { type: 'string', description: 'Optional short topic, e.g. 婚姻, 求财, 官司.' };
+  }
+  return { type: 'function', function: { name, description: info.desc, parameters: { type: 'object', properties, required } } };
+}
+
+/** Offer only the tools whose required context (birth / event time) is present. */
+function buildChatTools(context) {
+  const have = { birth: Boolean(context.birth), event: Boolean(context.eventTime) };
+  const tools = Object.entries(CHAT_TOOLS)
+    .filter(([, info]) => info.needs.every((n) => have[n]))
+    .map(([name, info]) => ({ schema: toolSchema(name, info) }));
+  return tools.length ? tools : null;
+}
+
+async function executeChatTool(name, args, context) {
+  const info = CHAT_TOOLS[name];
+  if (!info) return `Unknown tool "${name}".`;
+  const opts = { module: info.module, birth: context.birth, eventTime: context.eventTime };
+  if (args?.question) opts.question = args.question;
+  if (args?.topic) opts.topic = args.topic;
+  try {
+    const r = await qimen.runModule(opts);
+    return r.text || '(no output)';
+  } catch (e) {
+    return `Could not run that reading: ${e.message}`;
+  }
+}
+
+/** Admin-only: ingest new/changed documents from the InsForge bucket. */
+async function handleKnowledgeSync(req, res) {
+  const token = process.env.ADMIN_TOKEN;
+  if (!token) return sendJson(res, 503, { error: 'sync disabled — set ADMIN_TOKEN to enable this endpoint' });
+  if (req.headers['x-admin-token'] !== token) return sendJson(res, 401, { error: 'unauthorized' });
+  if (!knowledge.enabled()) return sendJson(res, 400, { error: 'InsForge docs bucket not configured' });
+  try {
+    sendJson(res, 200, await knowledge.sync());
+  } catch (e) {
+    sendJson(res, 500, { error: e.message });
+  }
+}
+
+/** LLM fallback translation for reading fragments the lexicon can't cover.
+ *  Body: { texts: [...] } -> { translations: { src: english } }. Cached. */
+const translateCache = new Map();
+async function handleTranslate(req, res) {
+  let body;
+  try { body = await readBody(req); } catch (e) { return sendJson(res, e.status || 400, { error: e.message }); }
+  const texts = Array.isArray(body.texts) ? body.texts.map(String).slice(0, 200) : [];
+  const out = {};
+  const need = [];
+  for (const t of texts) {
+    if (translateCache.has(t)) out[t] = translateCache.get(t);
+    else if (/[一-鿿]/.test(t)) need.push(t);
+  }
+  if (need.length) {
+    try {
+      const tr = await llm.translateBatch([...new Set(need)], 'English');
+      for (const [k, v] of Object.entries(tr)) {
+        if (translateCache.size < 5000) translateCache.set(k, v);
+        out[k] = v;
+      }
+    } catch (e) {
+      console.error(`[${new Date().toISOString()}] /api/translate:`, e.message);
+    }
+  }
+  sendJson(res, 200, { translations: out });
+}
+
+/** Streaming chat over SSE. Body: { messages:[{role,content}], context?, lang? } */
+async function handleChat(req, res) {
+  let body;
+  try {
+    body = await readBody(req);
+  } catch (err) {
+    return sendJson(res, err.status || 400, { error: err.message });
+  }
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'Access-Control-Allow-Origin': CORS_ORIGIN,
+  });
+  const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
+  const ac = new AbortController();
+  req.on('close', () => ac.abort());
+  try {
+    send({ type: 'meta', provider: llm.PROVIDER });
+    const messages = Array.isArray(body.messages) ? body.messages : [];
+    const context = body.context || {};
+
+    // Apply true solar time to birth/event datetimes when a longitude is given,
+    // matching the analysis tabs so the chat and tabs agree.
+    if (context.longitude != null) {
+      try {
+        applySolarCorrection(context, 'birth');
+        if (context.eventTime) applySolarCorrection(context, 'eventTime');
+      } catch (e) {
+        console.error(`[${new Date().toISOString()}] /api/chat solar:`, e.message);
+      }
+    }
+
+    // Auto-compute the BaZi chart from birth details so the model can interpret
+    // directly instead of asking the user to compute it elsewhere.
+    if (context.birth) {
+      try {
+        const summary = await bazi.chartSummary({ birth: context.birth, gender: context.gender === 'female' ? 'female' : 'male' });
+        context.chartText = summary + (context.chartText ? `\n\nPrior on-screen reading:\n${context.chartText}` : '');
+      } catch (e) {
+        console.error(`[${new Date().toISOString()}] /api/chat chart:`, e.message);
+      }
+    }
+
+    // RAG: retrieve reference chunks for the latest user question.
+    const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+    if (lastUser && (await vectorstore.count()) !== 0) {
+      try {
+        const qvec = await embeddings.embedOne(lastUser.content);
+        const hits = await vectorstore.search(qvec, 6);
+        const useful = hits.filter((h) => h.score > 0.15);
+        if (useful.length) {
+          context.retrieved = useful.map((h) => `(${h.meta?.title || h.id}) ${h.text}`);
+          // De-duplicate by document title (several chunks often share one PDF).
+          const byTitle = new Map();
+          for (const h of useful) {
+            const title = h.meta?.title || h.id;
+            if (!byTitle.has(title)) byTitle.set(title, Number(h.score.toFixed(3)));
+          }
+          send({ type: 'sources', items: [...byTitle].map(([title, score]) => ({ title, score })) });
+        }
+      } catch (e) {
+        console.error(`[${new Date().toISOString()}] /api/chat retrieval:`, e.message);
+      }
+    }
+
+    await llm.streamChat({
+      messages,
+      context,
+      lang: body.lang || 'en',
+      tier: typeof body.modelTier === 'string' ? body.modelTier : 'auto',
+      signal: ac.signal,
+      tools: buildChatTools(context),
+      executeTool: (name, args) => executeChatTool(name, args, context),
+      onToken: (t) => send({ type: 'token', text: t }),
+      onEvent: (ev) => send(ev), // e.g. { type: 'tool', name }
+    });
+    send({ type: 'done' });
+  } catch (err) {
+    if (!ac.signal.aborted) {
+      console.error(`[${new Date().toISOString()}] /api/chat:`, err.message);
+      send({ type: 'error', message: err.message });
+    }
+  } finally {
+    res.end();
+  }
+}
+
 const server = http.createServer(async (req, res) => {
-  const routeKey = `${req.method} ${req.url.split('?')[0]}`;
+  // CORS preflight — lets a browser on a different origin call the JSON API.
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': CORS_ORIGIN,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Max-Age': '86400',
+    });
+    res.end();
+    return;
+  }
+  const reqPath = req.url.split('?')[0];
+
+  // Streaming chat endpoint (Server-Sent Events) — handled outside the JSON routes.
+  if (req.method === 'POST' && reqPath === '/api/chat') {
+    return handleChat(req, res);
+  }
+  if (req.method === 'POST' && reqPath === '/api/knowledge/sync') {
+    return handleKnowledgeSync(req, res);
+  }
+  if (req.method === 'POST' && reqPath === '/api/translate') {
+    return handleTranslate(req, res);
+  }
+
+  const routeKey = `${req.method} ${reqPath}`;
   const handler = routes[routeKey];
   if (!handler) {
     if (req.method === 'GET' || req.method === 'HEAD') return serveStatic(req, res);
@@ -186,4 +418,21 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`Qi Men Superpowers listening on http://localhost:${PORT}`);
   console.log(`Astrology-API.io integration: ${process.env.ASTROLOGY_API_KEY ? 'enabled' : 'disabled (local BaZi calculation only)'}`);
+  console.log(`Chat: LLM=${llm.PROVIDER} · embeddings=${embeddings.PROVIDER} · vectorStore=${vectorstore.BACKEND}`);
+  // Preload the knowledge index so config problems surface at boot, not on the
+  // first question. Non-fatal: chat still works without retrieval.
+  vectorstore.count()
+    .then((n) => console.log(`Knowledge base: ${n} chunks loaded from "${vectorstore.BACKEND}"`))
+    .catch((e) => console.warn(`Knowledge base unavailable (${vectorstore.BACKEND}): ${e.message} — chat will run without retrieval`));
+
+  // Auto-ingest documents dropped in the InsForge bucket.
+  if (knowledge.enabled() && process.env.KNOWLEDGE_SYNC_ON_BOOT !== 'false') {
+    knowledge.sync()
+      .then((r) => console.log(`Knowledge sync: ${r.newChunks || 0} new chunks from ${r.changedFiles || 0} changed file(s) (${r.files || 0} docs in bucket)`))
+      .catch((e) => console.warn(`Knowledge sync failed: ${e.message}`));
+  }
+  const syncMins = Number(process.env.KNOWLEDGE_SYNC_MINUTES || 0);
+  if (syncMins > 0 && knowledge.enabled()) {
+    setInterval(() => knowledge.sync().catch((e) => console.warn(`Knowledge sync failed: ${e.message}`)), syncMins * 60000).unref();
+  }
 });

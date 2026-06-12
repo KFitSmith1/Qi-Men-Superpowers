@@ -1,7 +1,7 @@
 {
   "sandbox": {
     "network": {
-      "allowedDomains": ["here.now"]
+      "allowedDomains": ["here.now", "api.openai.com", "4v8vq8nw.us-east.insforge.app"]
     }
   }
 }

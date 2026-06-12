@@ -4,3 +4,5 @@ node_modules/
 qmen_*.json
 60ke/
 .DS_Store
+server/data/
+vectors.json
